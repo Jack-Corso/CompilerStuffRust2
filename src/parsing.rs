@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 use crate::lexing::Token;
+use crate::parsing::Expression::{BinaryOp, VarAssignment};
 use crate::typing::Type;
 
 macro_rules! peek_or_ret {
@@ -157,6 +158,7 @@ fn parse_block_item(tokens: &mut TokenStack) -> Option<BlockItem> {
 
 fn parse_statement(tokens: &mut TokenStack) -> Option<Statement> {
     if let Some(expr) = parse_expression(tokens, 0) {
+        pop_or_panic!(";", tokens, "Expected expression to end with ';'");
         return Some(Statement::Expression {expression: Box::new(expr)});
     }
     let current = peek_or_ret!(tokens, 0);
@@ -184,7 +186,53 @@ fn parse_statement(tokens: &mut TokenStack) -> Option<Statement> {
 
 fn parse_expression(tokens: &mut TokenStack, min_precedence: usize) -> Option<Expression> {
     let mut left = parse_factor(tokens)?;
-    todo!()
+    loop {
+
+        let next_token = tokens.front();
+        if (next_token.is_none()) {
+            return Some(left);
+        }
+
+        let next_token = &next_token.unwrap().clone();
+        match next_token {
+            Token::Operator(operator) if is_binary_op(operator) => {
+                let precedence = get_precedence(operator);
+                if (precedence > min_precedence) {
+                    tokens.pop_front();
+                    if (is_assignment_op(operator)) { // right associative
+                        let mut right = parse_expression(tokens, precedence).expect("Expected expression after assignment");
+                        match (&left) {
+                            Expression::Var { name } => {
+                                if operator.len() == 2 {
+                                    // get first char
+                                    let extra_op = operator.strip_suffix("=").unwrap().to_string();
+                                    right = Expression::BinaryOp {
+                                        operator: extra_op,
+                                        left: Box::new(right),
+                                        right: Box::new(Expression::Var { name: name.clone() }),
+                                    }
+                                }
+                                left = VarAssignment { name: name.clone(), value: Box::new(right) };
+                            },
+                            _=> panic!("Expected variable name before assignment var")
+                        }
+                    } else {
+                        let right = parse_expression(tokens, precedence).expect("Expected expression after binary op");
+                        left = BinaryOp {
+                            operator: operator.clone(),
+                            left: Box::new(left),
+                            right: Box::new(right),
+                        };
+                    }
+                } else {
+                    break;
+                }
+            },
+            _ => break
+        };
+    };
+    return Some(left);
+
 }
 
 fn parse_factor(tokens: &mut TokenStack) -> Option<Expression> {
