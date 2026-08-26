@@ -138,6 +138,7 @@ fn parse_function(tokens: &mut TokenStack) -> Option<Function> {
         block_items.push(parse_block_item(&mut *tokens).expect("Unexpected token sequence"));
         next = tokens.front().expect("Expected \"}\" to close function body");
     }
+    tokens.pop_front();
 
     Some(Function {
         name,
@@ -286,6 +287,7 @@ fn parse_var_definition(tokens: &mut TokenStack) -> Option<VarDeclaration> {
         pop_or_panic!(":", tokens, "Expected type annotation for var");
         pop_or_panic!("i32", tokens);
         return if (tokens.front().is_some() && tokens.front().unwrap().content() == "=") {
+            tokens.pop_front();
             let init_value = parse_expression(tokens, 0).expect("Expected expression after variable initializer");
             pop_or_panic!(";", tokens, "Expected \";\" after var init");
             Some(VarDeclaration {

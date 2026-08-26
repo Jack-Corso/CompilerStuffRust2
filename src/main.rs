@@ -10,6 +10,7 @@ mod lexing;
 mod parsing;
 mod typing;
 mod debugging;
+mod stack;
 
 fn main() -> std::io::Result<()> {
     let args: Vec<String> = env::args().collect();
