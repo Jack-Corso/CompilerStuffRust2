@@ -35,7 +35,12 @@ impl StackFrame {
     }
 
     pub fn reserve(&mut self, size: usize) -> StackAddr {
+        let error_msg = "No available stack mem with the given size";
+        return self.free_mem.get_mut(&size).expect(error_msg).pop().expect(error_msg);
+    }
 
+    pub fn size(&self) -> usize {
+        self.size
     }
 
 }
