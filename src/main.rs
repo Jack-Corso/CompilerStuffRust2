@@ -11,6 +11,8 @@ mod parsing;
 mod typing;
 mod debugging;
 mod stack;
+mod passes;
+mod assembly;
 
 fn main() -> std::io::Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -23,10 +25,14 @@ fn main() -> std::io::Result<()> {
     let start_time = Instant::now();
     let res = lexing::tokenize(reader);
 
-    let ast = parse(res);
+    let mut ast = parse(res);
+    passes::validate_vars(&mut ast);
+    passes::scope_vars(&mut ast);
+    passes::validate_returns(&mut ast);
+    
     ast.pretty_println(0);
 
     println!("Done Tokenizing in {}ms", start_time.elapsed().as_millis());
-    
+
     Ok(())
 }

@@ -105,14 +105,14 @@ pub enum BlockItem {
 }
 type TokenStack = VecDeque<Token>;
 pub fn parse(tokens: Vec<Token>) -> Program {
-    let mut stack: TokenStack = tokens.into_iter().rev().collect();
+    let mut stack: TokenStack = tokens.into_iter().collect();
     let mut functions: Vec<Function> = Vec::new();
 
     while let Some(func) = parse_function(&mut stack) {
         functions.push(func);
     };
     if !stack.is_empty() {
-        panic!("Unexpected tokens at end of file")
+        panic!("Unexpected tokens at end of file: {stack:?}")
     }
 
     Program { body: functions }

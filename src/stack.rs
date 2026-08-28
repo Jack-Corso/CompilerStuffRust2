@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
+use crate::parsing::{BlockItem, Expression, Function, Statement};
 
 pub struct StackFrame {
     free_mem: HashMap<usize, Vec<StackAddr>>,
@@ -8,7 +9,7 @@ pub struct StackFrame {
 }
 
 impl StackFrame {
-    pub fn new() -> StackFrame {
+    fn new() -> StackFrame {
         StackFrame {
             free_mem: HashMap::new(),
             size: 0,
@@ -37,6 +38,10 @@ impl StackFrame {
     pub fn reserve(&mut self, size: usize) -> StackAddr {
         let error_msg = "No available stack mem with the given size";
         return self.free_mem.get_mut(&size).expect(error_msg).pop().expect(error_msg);
+    }
+
+    pub fn free(&mut self, addr: StackAddr) {
+        self.free_mem.get_mut(&addr.size).unwrap().push(addr);
     }
 
     pub fn size(&self) -> usize {
@@ -81,4 +86,67 @@ impl StackAddr {
         self.size
     }
 
+}
+
+pub fn create_stack_frame(func: &Function) -> StackFrame {
+    let mut stack_frame = StackFrame::new();
+    update_stack_frame_block(&mut stack_frame, &func.body);
+
+    stack_frame
+}
+
+fn update_stack_frame_block(stack_frame: &mut StackFrame, block_items: &Vec<BlockItem>) {
+    let mut scope_vars: Vec<StackAddr> = Vec::new();
+    for block_item in block_items {
+        match block_item {
+            BlockItem::Statement(statement) => {
+                update_stack_frame_statement(stack_frame, statement);
+            },
+            BlockItem::VarDeclaration(var_declaration) => {
+                let var_size = var_declaration.var_type.get_size();
+                stack_frame.alloc_if_missing(var_size);
+                scope_vars.push(stack_frame.reserve(var_size));
+            }
+        }
+    }
+    for addr in scope_vars {
+        stack_frame.free(addr);
+    }
+}
+
+fn update_stack_frame_statement(stack_frame: &mut StackFrame, statement: &Statement) {
+    match statement {
+        Statement::Expression { expression} => {
+            update_stack_frame_expression(stack_frame, expression);
+        },
+        Statement::Block { items } => {
+            update_stack_frame_block(stack_frame, items);
+        },
+        Statement::Return { value } => {
+            update_stack_frame_expression(stack_frame, value);
+        }
+    }
+}
+
+fn update_stack_frame_expression(stack_frame: &mut StackFrame, expression: &Expression) {
+    match expression {
+        Expression::BinaryOp {
+            left,
+            right,
+            ..
+        } => {
+            update_stack_frame_expression(stack_frame, right);
+            stack_frame.alloc_if_missing(4);
+            let temp_addr = stack_frame.reserve(4);
+            update_stack_frame_expression(stack_frame, left);
+        },
+        Expression::VarAssignment { value, .. } => {
+            update_stack_frame_expression(stack_frame, value);
+        },
+        Expression::UnaryOp { target, .. } => {
+            update_stack_frame_expression(stack_frame, target);
+        },
+        Expression::Var { .. } => {},
+        Expression::Int32Constant { .. } => {},
+    }
 }
