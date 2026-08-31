@@ -50,7 +50,7 @@ impl StackFrame {
 
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq)]
 pub struct StackAddr {
     offset: usize,
     size: usize,
@@ -66,6 +66,11 @@ impl Display for StackAddr {
 impl Hash for StackAddr {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.offset.hash(state);
+    }
+}
+impl PartialEq for StackAddr {
+    fn eq(&self, other: &Self) -> bool {
+        self.offset == other.offset
     }
 }
 
