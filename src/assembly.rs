@@ -1,10 +1,12 @@
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 use std::io::Write;
 use std::fs::File;
 use std::io;
 use std::io::BufWriter;
+use paste::paste;
 use crate::parsing::Program;
 use crate::stack::StackAddr;
+use strum_macros::Display;
 
 enum Instruction {
     Return {
@@ -88,6 +90,7 @@ impl Display for Value {
             Value::Address(addr) => write!(f, "{addr}"),
             Value::Register(reg) => write!(f, "{reg}"),
         }
+        strum::Into
     }
 }
 
@@ -96,6 +99,7 @@ enum UnaryOperator {
     Negate,
     Not
 }
+
 
 enum BinaryOperator {
     Add,
@@ -109,46 +113,127 @@ enum BinaryOperator {
     GreaterThan,
     GreaterOrEqual,
 }
+macro_rules! as_item {
+    ($i:item) => { $i };
+}
+macro_rules! expand_registers {
+    (pat_branch_h: $letter:ident) => {
+        paste! {
+            Register::[<R $letter X>]
+                | Register::[<E $letter X>]
+                | Register::[< $letter X>]
+                | Register::[< $letter H>]
+                | Register::[< $letter L>]
+        }
+    };
+    (pat_branch: $letter:ident) => {
+        paste! {
+            Register::[<R $letter >]
+                | Register::[<E $letter >]
+                | Register::[< $letter >]
+                | Register::[< $letter L>]
+        }
+    };
 
-#[derive(Eq, PartialEq)]
-enum Register {
-    RAX,
-    EAX,
-    AX,
-    AH,
-    AL,
-    RDX,
-    EDX,
-    DX,
-    DH,
-    DL
+    (enum_def: $name: ident { $($vals:tt)* } + [$($letter:ident),*] + [$($letter_no_h:ident),*]nh) => {
+            paste::item! {
+                #[derive(Eq, PartialEq, strum_macros::EnumString)]
+                enum Register {
+                    $($vals)*
+                    $(
+
+                        [<R $letter X>],
+                        [<E $letter X>],
+
+                        [< $letter X>],
+
+                        [< $letter H>],
+                        [< $letter L>],
+                    )*
+                    $(
+                        [<R $letter_no_h >],
+                        [<E $letter_no_h >],
+                        [< $letter_no_h >],
+                        [< $letter_no_h L>],
+                    )*
+                }
+            }
+    };
+
 }
-macro_rules! reg_branch {
-    ($letter:tt) => {
-        Register::R($letter)X | Register::E$letterX | Register::$letterX | Register::$letterH | Register::$letterL
-    }
-}
+
+expand_registers!(enum_def:
+    Register {
+
+    } + [A, B, C, D] + [SI, DI]nh
+);
+
+
 impl Register {
 
     fn as_64_bit(&self) -> Register {
-
         match (self) {
-            Register::RAX | Register::EAX | Register::AX | Register::AH | Register::AL => Register::RAX,
-            Register::RDX | Register::EDX | Register::DX | Register::DH | Register::DL => Register::RDX,
-            reg_branch!(A) => Register::RAX
+            expand_registers!(pat_branch_h: A) => Register::RAX,
+            expand_registers!(pat_branch_h: B) => Register::RBX,
+            expand_registers!(pat_branch_h: C) => Register::RCX,
+            expand_registers!(pat_branch_h: D) => Register::RDX,
+            expand_registers!(pat_branch: SI) => Register::RSI,
+            expand_registers!(pat_branch: DI) => Register::RDI,
+        }
+    }
 
+    fn as_32_bit(&self) -> Register {
+        match (self) {
+            expand_registers!(pat_branch_h: A) => Register::EAX,
+            expand_registers!(pat_branch_h: B) => Register::EBX,
+            expand_registers!(pat_branch_h: C) => Register::ECX,
+            expand_registers!(pat_branch_h: D) => Register::EDX,
+            expand_registers!(pat_branch: SI) => Register::ESI,
+            expand_registers!(pat_branch: DI) => Register::EDI,
+        }
+    }
+
+    fn as_16_bit(&self) -> Register {
+        match (self) {
+            expand_registers!(pat_branch_h: A) => Register::AX,
+            expand_registers!(pat_branch_h: B) => Register::BX,
+            expand_registers!(pat_branch_h: C) => Register::CX,
+            expand_registers!(pat_branch_h: D) => Register::DX,
+            expand_registers!(pat_branch: SI) => Register::SI,
+            expand_registers!(pat_branch: DI) => Register::DI,
+        }
+    }
+
+    fn as_8_bit(&self) -> Register {
+        match (self) {
+            expand_registers!(pat_branch_h: A) => Register::AL,
+            expand_registers!(pat_branch_h: B) => Register::BL,
+            expand_registers!(pat_branch_h: C) => Register::CL,
+            expand_registers!(pat_branch_h: D) => Register::DL,
+            expand_registers!(pat_branch: SI) => Register::SIL,
+            expand_registers!(pat_branch: DI) => Register::DIL,
+        }
+    }
+
+    fn as_8_bit_high(&self) -> Register {
+        match (self) {
+            expand_registers!(pat_branch_h: A) => Register::AH,
+            expand_registers!(pat_branch_h: B) => Register::BH,
+            expand_registers!(pat_branch_h: C) => Register::CH,
+            expand_registers!(pat_branch_h: D) => Register::DH,
+            _ => panic!("Register {self} does not have a high byte view")
         }
     }
 }
 
 impl Display for Register {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Register::EAX => write!(f, "%eax"),
-            Register::EDX => write!(f, "%edx"),
-        }
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut string = self.to_string();
+        string.make_ascii_lowercase();
+        write!(f, "%{}", string)
     }
 }
+
 
 pub fn generate_asm(ast: Program, out: BufWriter<File>) {
 
