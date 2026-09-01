@@ -4,9 +4,10 @@ use std::fs::File;
 use std::io;
 use std::io::BufWriter;
 use paste::paste;
+use strum::VariantArray;
 use crate::parsing::Program;
 use crate::stack::StackAddr;
-use strum_macros::Display;
+use strum_macros::VariantArray;
 
 enum Instruction {
     Return {
@@ -90,7 +91,6 @@ impl Display for Value {
             Value::Address(addr) => write!(f, "{addr}"),
             Value::Register(reg) => write!(f, "{reg}"),
         }
-        strum::Into
     }
 }
 
@@ -113,9 +113,7 @@ enum BinaryOperator {
     GreaterThan,
     GreaterOrEqual,
 }
-macro_rules! as_item {
-    ($i:item) => { $i };
-}
+
 macro_rules! expand_registers {
     (pat_branch_h: $letter:ident) => {
         paste! {
@@ -135,26 +133,33 @@ macro_rules! expand_registers {
         }
     };
 
-    (enum_def: $name: ident { $($vals:tt)* } + [$($letter:ident),*] + [$($letter_no_h:ident),*]nh) => {
+    (enum_def: $name: ident { $($vals:tt)* } + [$($letter:ident),*] + [$($letter_no_h:ident),*]nh + [$($letter_num:ident: [$($num:literal)*,]),*]num) => {
             paste::item! {
-                #[derive(Eq, PartialEq, strum_macros::EnumString)]
+                #[derive(Copy, Clone, Eq, PartialEq, strum_macros::EnumString, strum_macros::VariantArray)]
                 enum Register {
                     $($vals)*
                     $(
 
                         [<R $letter X>],
                         [<E $letter X>],
-
                         [< $letter X>],
-
-                        [< $letter H>],
                         [< $letter L>],
+                        [< $letter H>],
                     )*
                     $(
                         [<R $letter_no_h >],
                         [<E $letter_no_h >],
                         [< $letter_no_h >],
                         [< $letter_no_h L>],
+                    )*
+                    $(
+                        $(
+                        [< $letter $num >],
+                        [< $letter $num D>],
+                        [< $letter $num W>],
+                        [< $letter $num B>],
+                        )*
+
                     )*
                 }
             }
@@ -165,64 +170,53 @@ macro_rules! expand_registers {
 expand_registers!(enum_def:
     Register {
 
-    } + [A, B, C, D] + [SI, DI]nh
+    } + [A, B, C, D] + [SI, DI]nh + [R: [0,2]]num
 );
 
 
 impl Register {
+    const HIGH_SIZE: usize = 5;
+    const LOW_SIZE: usize = 4;
+    const HIGH_VIEW_CUTOFF: usize = Self::HIGH_SIZE * 4;
+    const LOW_VIEW_CUTOFF: usize = Self::HIGH_VIEW_CUTOFF + Self::LOW_SIZE * 2;
 
     fn as_64_bit(&self) -> Register {
-        match (self) {
-            expand_registers!(pat_branch_h: A) => Register::RAX,
-            expand_registers!(pat_branch_h: B) => Register::RBX,
-            expand_registers!(pat_branch_h: C) => Register::RCX,
-            expand_registers!(pat_branch_h: D) => Register::RDX,
-            expand_registers!(pat_branch: SI) => Register::RSI,
-            expand_registers!(pat_branch: DI) => Register::RDI,
-        }
+        self.as_nth(0)
     }
 
     fn as_32_bit(&self) -> Register {
-        match (self) {
-            expand_registers!(pat_branch_h: A) => Register::EAX,
-            expand_registers!(pat_branch_h: B) => Register::EBX,
-            expand_registers!(pat_branch_h: C) => Register::ECX,
-            expand_registers!(pat_branch_h: D) => Register::EDX,
-            expand_registers!(pat_branch: SI) => Register::ESI,
-            expand_registers!(pat_branch: DI) => Register::EDI,
-        }
+        self.as_nth(1)
     }
 
     fn as_16_bit(&self) -> Register {
-        match (self) {
-            expand_registers!(pat_branch_h: A) => Register::AX,
-            expand_registers!(pat_branch_h: B) => Register::BX,
-            expand_registers!(pat_branch_h: C) => Register::CX,
-            expand_registers!(pat_branch_h: D) => Register::DX,
-            expand_registers!(pat_branch: SI) => Register::SI,
-            expand_registers!(pat_branch: DI) => Register::DI,
-        }
+        self.as_nth(2)
     }
 
     fn as_8_bit(&self) -> Register {
-        match (self) {
-            expand_registers!(pat_branch_h: A) => Register::AL,
-            expand_registers!(pat_branch_h: B) => Register::BL,
-            expand_registers!(pat_branch_h: C) => Register::CL,
-            expand_registers!(pat_branch_h: D) => Register::DL,
-            expand_registers!(pat_branch: SI) => Register::SIL,
-            expand_registers!(pat_branch: DI) => Register::DIL,
-        }
+        self.as_nth(3)
     }
 
     fn as_8_bit_high(&self) -> Register {
-        match (self) {
-            expand_registers!(pat_branch_h: A) => Register::AH,
-            expand_registers!(pat_branch_h: B) => Register::BH,
-            expand_registers!(pat_branch_h: C) => Register::CH,
-            expand_registers!(pat_branch_h: D) => Register::DH,
-            _ => panic!("Register {self} does not have a high byte view")
+        if !self.has_8_bit_high() {
+            panic!("Register: {self} does not have a high 8 bit view.");
         }
+        self.as_nth(4)
+    }
+
+    fn has_8_bit_high(&self) -> bool {
+        match (self) {
+            expand_registers!(pat_branch: SI) | expand_registers!(pat_branch: DI) => false,
+            _ => true
+        }
+    }
+
+    fn as_nth(&self, n: usize) -> Register {
+        let num = *self as usize;
+        return if num < Self::HIGH_VIEW_CUTOFF {
+            Self::VARIANTS[num - (num % Self::HIGH_SIZE)]
+        } else {
+            Self::VARIANTS[num - ((num - Self::HIGH_VIEW_CUTOFF) % Self::LOW_SIZE)]
+        };
     }
 }
 
