@@ -1,3 +1,4 @@
+use std::arch::x86_64::_bittestandset64;
 use std::fmt::{Display, Formatter};
 use std::io::Write;
 use std::fs::File;
@@ -68,9 +69,20 @@ impl Instruction {
                 }
             },
             Instruction::Unary { operator, target, dest } => {
+                Instruction::Copy {src: *target, dest: *dest }.write_to(out)?;
                 match operator {
-                    UnaryOperator::Negate => writeln!(out, "\tneg {target}")?;
-                    UnaryOperator::Not => e
+                    UnaryOperator::Negate => writeln!(out, "\tneg {dest}")?,
+                    UnaryOperator::Compliment => writeln!(out, "\tnot {dest}")?,
+                    UnaryOperator::Not => {
+                        writeln!(out, "\tcmpl $0, {dest}")?;
+                        writeln!(out, "\tmovl $0, {dest}")?;
+                        let low_byte_view = match dest {
+                            Value::Register( val ) => Value::Register(val.as_8_bit()),
+                            Value::Address( addr ) => todo!(),
+                            Value::Int32Literal( .. ) => panic!("Invalid Destination Register")
+                        };
+                        writeln!(out, "\tsete {low_byte_view}")?;
+                    }
                 }
             }
         }
@@ -83,6 +95,7 @@ enum Value {
     Address(StackAddr),
     Register(Register)
 }
+
 
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -133,7 +146,7 @@ macro_rules! expand_registers {
         }
     };
 
-    (enum_def: $name: ident { $($vals:tt)* } + [$($letter:ident),*] + [$($letter_no_h:ident),*]nh + [$($letter_num:ident: [$($num:literal)*,]),*]num) => {
+    (enum_def: $name: ident { $($vals:tt)* } + [$($letter:ident),*] + [$($letter_no_h:ident),*]nh) => {
             paste::item! {
                 #[derive(Copy, Clone, Eq, PartialEq, strum_macros::EnumString, strum_macros::VariantArray)]
                 enum Register {
@@ -152,15 +165,7 @@ macro_rules! expand_registers {
                         [< $letter_no_h >],
                         [< $letter_no_h L>],
                     )*
-                    $(
-                        $(
-                        [< $letter $num >],
-                        [< $letter $num D>],
-                        [< $letter $num W>],
-                        [< $letter $num B>],
-                        )*
 
-                    )*
                 }
             }
     };
@@ -170,7 +175,7 @@ macro_rules! expand_registers {
 expand_registers!(enum_def:
     Register {
 
-    } + [A, B, C, D] + [SI, DI]nh + [R: [0,2]]num
+    } + [A, B, C, D] + [SI, DI]nh
 );
 
 
@@ -194,6 +199,16 @@ impl Register {
 
     fn as_8_bit(&self) -> Register {
         self.as_nth(3)
+    }
+
+    fn as_n_bit(&self, num_bits: u8) -> Register {
+        match (num_bits) {
+            8 => self.as_8_bit(),
+            16 => self.as_16_bit(),
+            32 => self.as_32_bit(),
+            64 => self.as_64_bit(),
+            _ => panic!("Cannot get view of size {num_bits} bits")
+        }
     }
 
     fn as_8_bit_high(&self) -> Register {

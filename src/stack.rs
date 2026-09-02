@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
+use std::rc::Rc;
 use crate::parsing::{BlockItem, Expression, Function, Statement};
 
 pub struct StackFrame {
@@ -55,6 +56,9 @@ pub struct StackAddr {
     offset: usize,
     size: usize,
     addr_str: String,
+    parent: Option<Rc<StackAddr>>,
+    in_use: bool,
+    self_ptr: Rc<StackAddr>
 }
 
 impl Display for StackAddr {
@@ -80,8 +84,13 @@ impl StackAddr {
             offset,
             size,
             addr_str: format!("-{offset}(%rbp)"),
+            parent: None,
+            in_use: false,
+            
         }
     }
+
+
 
     pub fn offset(&self) -> usize {
         self.offset
@@ -89,6 +98,15 @@ impl StackAddr {
 
     pub fn size(&self) -> usize {
         self.size
+    }
+
+    pub fn get_n_bit_view(&self, num_bits: usize) -> StackAddr {
+        if num_bits > self.size {
+            panic!("Cannot create view larger than existing address")
+        }
+        StackAddr {
+            offset: self.offset +
+        }
     }
 
 }
