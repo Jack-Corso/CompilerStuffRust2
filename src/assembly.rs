@@ -1,14 +1,17 @@
 use std::arch::x86_64::_bittestandset64;
+use std::cmp::PartialEq;
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::io::Write;
-use std::fs::File;
+use std::fs::{File, ReadDir};
 use std::io;
 use std::io::BufWriter;
 use paste::paste;
 use strum::VariantArray;
-use crate::parsing::Program;
-use crate::stack::StackAddr;
+use crate::parsing::{BlockItem, Function, Program, Statement};
+use crate::stack::{StackAddr, StackFrame};
 use strum_macros::VariantArray;
+use crate::stack;
 
 enum Instruction {
     Return {
@@ -43,10 +46,25 @@ enum Instruction {
     Label {
         label: String,
     },
+    StackSetup {
+        size: usize,
+        func_name: String,
+    },
+    StackCleanup {
+        size: usize,
+        return_label: String,
+    },
 }
 
 impl Instruction {
-    fn write_to(&self, out: &mut BufWriter<File>) -> io::Result<()> {
+
+    fn move_if_needed(src: &Value, dest: &Value, out: &mut BufWriter<File>) -> io::Result<()>  {
+        if src != dest {
+            writeln!(out, "\tmovl {src}, {dest}")?;
+        }
+        Ok(())
+    }
+    pub fn write_to(&self, out: &mut BufWriter<File>) -> io::Result<()> {
 
         match self {
             Instruction::Return { value } => {
@@ -69,7 +87,9 @@ impl Instruction {
                 }
             },
             Instruction::Unary { operator, target, dest } => {
-                Instruction::Copy {src: *target, dest: *dest }.write_to(out)?;
+                if target != dest {
+                    writeln!(out, "\tmovl {target}, {dest}")?;
+                }
                 match operator {
                     UnaryOperator::Negate => writeln!(out, "\tneg {dest}")?,
                     UnaryOperator::Compliment => writeln!(out, "\tnot {dest}")?,
@@ -78,15 +98,84 @@ impl Instruction {
                         // clear dest
                         writeln!(out, "\tmovl $0, {dest}")?;
                         let low_byte_view = match dest {
-                            Value::Register( val ) => Value::Register(val.as_8_bit()),
+                            Value::Register( val ) => Value::Register(val.as_1_byte()),
                             // address views should be one time use, this one exits scope immediately, so its ok
                             Value::Address( addr ) => Value::Address(addr.get_n_byte_view(1)),
                             Value::Int32Literal( .. ) => panic!("Invalid Destination Register")
                         };
                         writeln!(out, "\tsete {low_byte_view}")?;
-
                     }
                 }
+            },
+            Instruction::StackSetup { size, func_name } => {
+                writeln!(out, ".globl _{func_name}")?;
+                writeln!(out, "_{func_name}:")?;
+                writeln!(out, "\tpushq %rbp")?;
+                writeln!(out, "\tmovq %rsp, %rbp")?;
+                writeln!(out, "\tsubq ${size}, %rsp")?;
+            },
+            Instruction::StackCleanup { size, return_label } => {
+                writeln!(out, "{return_label}:")?;
+                writeln!(out, "\tmovq %rbp, %rsp")?;
+                writeln!(out, "\tpopq %rbp")?;
+                writeln!(out, "\tret")?;
+            }
+            Instruction::Label { label } => {
+                writeln!(out, "{label}:")?;
+            },
+            Instruction::Binary { operator, left, right, dest } => {
+                if *operator == BinaryOperator::Divide {
+                    Self::move_if_needed(left, &Value::Register(Register::EAX), out)?;
+                    writeln!(out, "\tcdq")?;
+                    writeln!(out, "\tidiv {right}")?;
+                    Self::move_if_needed(&Value::Register(Register::EAX), dest, out)?;
+                } else {
+                    Self::move_if_needed(left, dest, out)?;
+                    macro_rules! cmp_and_clear {
+                        () => {
+                            {
+                                writeln!(out, "\tcmpl {right}, {dest}")?;
+                                writeln!(out, "movl $0, {dest}")?;
+                                dest.get_n_byte_view(1)
+                            }
+                        };
+                    }
+                    match operator {
+                        BinaryOperator::Add => writeln!(out, "\taddl {right}, {dest}")?,
+                        BinaryOperator::Subtract => writeln!(out, "\tsubl {right}, {dest}")?,
+                        BinaryOperator::Multiply => writeln!(out, "\timull {right}, {dest}")?,
+
+                        BinaryOperator::Equal => {
+                            // technically an extra move idc tho lowkey
+                            let low_view = cmp_and_clear!();
+                            writeln!(out, "\tsete {low_view}")?
+                        },
+                        BinaryOperator::NotEqual => {
+                            // technically an extra move idc tho lowkey
+                            let low_view = cmp_and_clear!();
+                            writeln!(out, "\tsetne {low_view}")?
+                        },
+                        BinaryOperator::GreaterThan => {
+                            // technically an extra move idc tho lowkey
+                            let low_view = cmp_and_clear!();
+                            writeln!(out, "\tsetg {low_view}")?
+                        },
+                        BinaryOperator::GreaterOrEqual => {
+                            let low_view = cmp_and_clear!();
+                            writeln!(out, "\tsetge {low_view}")?
+                        },
+                        BinaryOperator::LessThan => {
+                            let low_view = cmp_and_clear!();
+                            writeln!(out, "\tsetl {low_view}")?
+                        },
+                        BinaryOperator::LessOrEqual => {
+                            let low_view = cmp_and_clear!();
+                            writeln!(out, "\tsetle {low_view}")?
+                        },
+                        BinaryOperator::Divide => unreachable!(),
+                    }
+                }
+
             }
         }
         Ok(())
@@ -110,13 +199,28 @@ impl Display for Value {
     }
 }
 
+impl Value {
+    pub fn get_n_byte_view(&self, num_bytes: usize) -> Value {
+        match self {
+            Value::Register( register ) => Value::Register(register.as_n_bytes(num_bytes as u8)),
+            Value::Address(addr) => Value::Address(addr.get_n_byte_view(num_bytes)),
+            _ => panic!("Cannot create {num_bytes} byte view of {self}")
+        }
+    }
+
+    pub fn is_storage(&self) -> bool {
+        matches!(self, Value::Register( .. ) | Value::Address( .. ))
+    }
+}
+
+#[derive(PartialEq, Eq, Copy, Clone)]
 enum UnaryOperator {
     Compliment,
     Negate,
     Not
 }
 
-
+#[derive(PartialEq, Eq, Copy, Clone)]
 enum BinaryOperator {
     Add,
     Subtract,
@@ -188,29 +292,30 @@ impl Register {
     const HIGH_VIEW_CUTOFF: usize = Self::HIGH_SIZE * 4;
     const LOW_VIEW_CUTOFF: usize = Self::HIGH_VIEW_CUTOFF + Self::LOW_SIZE * 2;
 
-    fn as_64_bit(&self) -> Register {
+
+    fn as_8_byte(&self) -> Register {
         self.as_nth(0)
     }
 
-    fn as_32_bit(&self) -> Register {
+    fn as_4_byte(&self) -> Register {
         self.as_nth(1)
     }
 
-    fn as_16_bit(&self) -> Register {
+    fn as_2_byte(&self) -> Register {
         self.as_nth(2)
     }
 
-    fn as_8_bit(&self) -> Register {
+    fn as_1_byte(&self) -> Register {
         self.as_nth(3)
     }
 
-    fn as_n_bit(&self, num_bits: u8) -> Register {
-        match (num_bits) {
-            8 => self.as_8_bit(),
-            16 => self.as_16_bit(),
-            32 => self.as_32_bit(),
-            64 => self.as_64_bit(),
-            _ => panic!("Cannot get view of size {num_bits} bits")
+    fn as_n_bytes(&self, num_bytes: u8) -> Register {
+        match (num_bytes) {
+            1 => self.as_1_byte(),
+            2 => self.as_2_byte(),
+            4 => self.as_4_byte(),
+            8 => self.as_8_byte(),
+            _ => panic!("Cannot get view of size {num_bytes} bits")
         }
     }
 
@@ -238,6 +343,8 @@ impl Register {
     }
 }
 
+static  {}
+
 impl Display for Register {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut string = self.to_string();
@@ -251,6 +358,97 @@ pub fn generate_asm(ast: Program, out: BufWriter<File>) {
 
 }
 
+struct LabelManager {
+    label_counts: HashMap<String, usize>
+}
+
+impl LabelManager {
+    fn new() -> LabelManager {
+        LabelManager { label_counts: HashMap::new() }
+    }
+
+    fn gen_ret_label(&mut self) -> String {
+        self.gen_label("return")
+    }
+
+    fn gen_label(&mut self, name: &str) -> String {
+        if (!self.label_counts.contains_key(name)) {
+            self.label_counts.insert(String::from(name), 0);
+        } else {
+            self.label_counts.insert(String::from(name), self.label_counts[name]+1);
+        }
+        self.last_label(name)
+    }
+
+    fn has_label(&self, name: &str) -> bool {
+        self.label_counts.contains_key(name)
+    }
+
+    fn last_label(&self, name: &str) -> String {
+        format!("{name}{}", self.label_counts[name])
+    }
+
+    fn last_ret_label(&self) -> String {
+        self.last_label("return")
+    }
+}
+
 fn create_tacky(ast: Program) -> Vec<Instruction> {
+    let mut instructions: Vec<Instruction> = Vec::new();
+    let mut label_manager = LabelManager::new();
+    for func in ast.body {
+        create_tacky_func(&func, &mut instructions);
+    }
+    return instructions;
+
+}
+
+fn create_tacky_func(func: &Function, instructions: &mut Vec<Instruction>, label_manager: &mut LabelManager) {
+    // semi-expensive
+    let mut stack = stack::create_stack_frame(func);
+    instructions.push(
+        Instruction::StackSetup {
+            func_name: func.name.clone(),
+            size: stack.size()
+        }
+    );
+
+    let ret_label = label_manager.gen_ret_label();
+
+    create_tacky_block(&func.body, instructions, &mut stack, label_manager);
+
+    instructions.push(
+        Instruction::StackCleanup {
+            return_label: ret_label,
+            size: stack.size()
+        }
+    );
+}
+
+fn create_tacky_block(
+    block_items: &Vec<BlockItem>,
+    instructions: &mut Vec<Instruction>,
+    stack_frame: &mut StackFrame,
+    label_manager: &mut LabelManager,
+    var_map: &mut HashMap<String, StackAddr>
+) {
+    let var_map = HashMap::new();
+
+    for block_item in block_items.iter() {
+        match block_item {
+            BlockItem::Statement( statement ) => create_tacky_statement(statement, instructions, stack_frame, label_manager),
+            BlockItem::VarDeclaration( var_declaration ) => {
+                stack_frame.
+            }
+        }
+    }
+}
+
+fn create_tacky_statement(
+    block_items: &Statement,
+    instructions: &mut Vec<Instruction>,
+    stack_frame: &mut StackFrame,
+    label_manager: &mut LabelManager
+) {
 
 }
