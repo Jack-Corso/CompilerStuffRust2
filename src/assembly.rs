@@ -75,13 +75,16 @@ impl Instruction {
                     UnaryOperator::Compliment => writeln!(out, "\tnot {dest}")?,
                     UnaryOperator::Not => {
                         writeln!(out, "\tcmpl $0, {dest}")?;
+                        // clear dest
                         writeln!(out, "\tmovl $0, {dest}")?;
                         let low_byte_view = match dest {
                             Value::Register( val ) => Value::Register(val.as_8_bit()),
-                            Value::Address( addr ) => todo!(),
+                            // address views should be one time use, this one exits scope immediately, so its ok
+                            Value::Address( addr ) => Value::Address(addr.get_n_byte_view(1)),
                             Value::Int32Literal( .. ) => panic!("Invalid Destination Register")
                         };
                         writeln!(out, "\tsete {low_byte_view}")?;
+
                     }
                 }
             }

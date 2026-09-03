@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use crate::parsing::{BlockItem, Expression, Function, Statement};
 
 pub struct StackFrame {
@@ -42,6 +42,9 @@ impl StackFrame {
     }
 
     pub fn free(&mut self, addr: StackAddr) {
+        if addr.is_view {
+            panic!("Cannot free a view of an address");
+        }
         self.free_mem.get_mut(&addr.size).unwrap().push(addr);
     }
 
@@ -56,9 +59,7 @@ pub struct StackAddr {
     offset: usize,
     size: usize,
     addr_str: String,
-    parent: Option<Rc<StackAddr>>,
-    in_use: bool,
-    self_ptr: Rc<StackAddr>
+    is_view: bool,
 }
 
 impl Display for StackAddr {
@@ -84,13 +85,9 @@ impl StackAddr {
             offset,
             size,
             addr_str: format!("-{offset}(%rbp)"),
-            parent: None,
-            in_use: false,
-            
+            is_view: false,
         }
     }
-
-
 
     pub fn offset(&self) -> usize {
         self.offset
@@ -100,14 +97,23 @@ impl StackAddr {
         self.size
     }
 
-    pub fn get_n_bit_view(&self, num_bits: usize) -> StackAddr {
-        if num_bits > self.size {
+    pub fn get_n_byte_view(&self, num_bytes: usize) -> StackAddr {
+        if num_bytes > self.size {
             panic!("Cannot create view larger than existing address")
+        } 
+        if self.is_view {
+            panic!("Cannot create a view of ")
         }
-        StackAddr {
-            offset: self.offset +
-        }
+        let offset = self.offset + (self.size - num_bytes);
+        let view = StackAddr {
+            offset,
+            size: num_bytes,
+            addr_str: format!("-{offset}(%rbp)"),
+            is_view: true,
+        };
+        return view;
     }
+    
 
 }
 
