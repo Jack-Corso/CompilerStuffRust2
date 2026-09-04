@@ -438,7 +438,7 @@ fn create_tacky_block(
         match block_item {
             BlockItem::Statement( statement ) => create_tacky_statement(statement, instructions, stack_frame, label_manager),
             BlockItem::VarDeclaration( var_declaration ) => {
-                stack_frame.
+                
             }
         }
     }

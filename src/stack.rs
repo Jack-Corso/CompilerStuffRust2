@@ -7,6 +7,7 @@ use crate::parsing::{BlockItem, Expression, Function, Statement};
 pub struct StackFrame {
     free_mem: HashMap<usize, Vec<StackAddr>>,
     size: usize,
+    var_map: HashMap<String, StackAddr>,
 }
 
 impl StackFrame {
@@ -39,6 +40,24 @@ impl StackFrame {
     pub fn reserve(&mut self, size: usize) -> StackAddr {
         let error_msg = "No available stack mem with the given size";
         return self.free_mem.get_mut(&size).expect(error_msg).pop().expect(error_msg);
+    }
+
+    pub fn reserve_var(&mut self, name: String, size: usize) -> &StackAddr {
+        if self.var_map.contains_key(&name) {
+            panic!("Variable {name} already exists in this scope");
+        }
+        let addr = StackAddr::new(self.size, size);
+        self.size += size;
+        self.var_map.insert(name.clone(), addr);
+        return self.var_map.get(&name).unwrap();
+    }
+
+    pub fn get_var(&self, name: &String) -> &StackAddr {
+        self.var_map.get(name).expect("Variable does not exist in this scope")
+    }
+
+    pub fn free_var(&mut self, name: &String) {
+        if self.var_map.remove(name).is_so() {}
     }
 
     pub fn free(&mut self, addr: StackAddr) {
