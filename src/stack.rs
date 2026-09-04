@@ -15,6 +15,7 @@ impl StackFrame {
         StackFrame {
             free_mem: HashMap::new(),
             size: 0,
+            var_map: HashMap::new(),
         }
     }
 
@@ -57,14 +58,19 @@ impl StackFrame {
     }
 
     pub fn free_var(&mut self, name: &String) {
-        if self.var_map.remove(name).is_so() {}
+        let addr = self.var_map.remove(name).expect("Tried freeing var that doesn't exist");
+        self.free_mem.get_mut(&addr.size).unwrap().push(addr);
     }
 
     pub fn free(&mut self, addr: StackAddr) {
         if addr.is_view {
             panic!("Cannot free a view of an address");
         }
-        self.free_mem.get_mut(&addr.size).unwrap().push(addr);
+        let addr_vec = self.free_mem.get_mut(&addr.size).unwrap();
+        if (addr_vec.contains(&addr)) {
+            panic!("Tried freeing address twice: {addr}")
+        }
+        addr_vec.push(addr);
     }
 
     pub fn size(&self) -> usize {
@@ -73,17 +79,16 @@ impl StackFrame {
 
 }
 
-#[derive(Clone, Debug, Eq)]
+#[derive(Clone, Copy, Debug, Eq)]
 pub struct StackAddr {
     offset: usize,
     size: usize,
-    addr_str: String,
     is_view: bool,
 }
 
 impl Display for StackAddr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.addr_str)
+        write!(f, "-{}(%rbp)", self.offset)
     }
 }
 
@@ -103,7 +108,6 @@ impl StackAddr {
         StackAddr {
             offset,
             size,
-            addr_str: format!("-{offset}(%rbp)"),
             is_view: false,
         }
     }
@@ -127,7 +131,6 @@ impl StackAddr {
         let view = StackAddr {
             offset,
             size: num_bytes,
-            addr_str: format!("-{offset}(%rbp)"),
             is_view: true,
         };
         return view;

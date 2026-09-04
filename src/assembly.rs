@@ -11,12 +11,10 @@ use strum::VariantArray;
 use crate::parsing::{BlockItem, Function, Program, Statement};
 use crate::stack::{StackAddr, StackFrame};
 use strum_macros::VariantArray;
+use crate::assembly::Register::EAX;
 use crate::stack;
 
 enum Instruction {
-    Return {
-        value: Value
-    },
     Unary {
         operator: UnaryOperator,
         target: Value,
@@ -67,9 +65,6 @@ impl Instruction {
     pub fn write_to(&self, out: &mut BufWriter<File>) -> io::Result<()> {
 
         match self {
-            Instruction::Return { value } => {
-                writeln!(out, "\tret")?;
-            },
             Instruction::JumpIfZero { condition, dest } => {
                 writeln!(out, "\tcmpl {condition}, 0")?;
                 writeln!(out, "\tje {dest}")?;
@@ -343,8 +338,6 @@ impl Register {
     }
 }
 
-static  {}
-
 impl Display for Register {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut string = self.to_string();
@@ -397,7 +390,7 @@ fn create_tacky(ast: Program) -> Vec<Instruction> {
     let mut instructions: Vec<Instruction> = Vec::new();
     let mut label_manager = LabelManager::new();
     for func in ast.body {
-        create_tacky_func(&func, &mut instructions);
+        create_tacky_func(&func, &mut instructions, &mut label_manager);
     }
     return instructions;
 
@@ -430,25 +423,27 @@ fn create_tacky_block(
     instructions: &mut Vec<Instruction>,
     stack_frame: &mut StackFrame,
     label_manager: &mut LabelManager,
-    var_map: &mut HashMap<String, StackAddr>
 ) {
-    let var_map = HashMap::new();
-
+    let mut variables: Vec<&String> = Vec::new();
     for block_item in block_items.iter() {
         match block_item {
             BlockItem::Statement( statement ) => create_tacky_statement(statement, instructions, stack_frame, label_manager),
             BlockItem::VarDeclaration( var_declaration ) => {
-                
+                variables.push(&var_declaration.name);
+                stack_frame.reserve_var(var_declaration.name.clone(), var_declaration.var_type.get_size());
             }
         }
+    }
+    for var_name in variables {
+        stack_frame.free_var(var_name);
     }
 }
 
 fn create_tacky_statement(
-    block_items: &Statement,
+    statement: &Statement,
     instructions: &mut Vec<Instruction>,
     stack_frame: &mut StackFrame,
     label_manager: &mut LabelManager
 ) {
-
+    
 }
