@@ -8,12 +8,12 @@ use std::io;
 use std::io::BufWriter;
 use paste::paste;
 use strum::VariantArray;
-use crate::parsing::{BlockItem, Function, Program, Statement};
+use crate::parsing::{BlockItem, Expression, Function, Program, Statement};
 use crate::stack::{StackAddr, StackFrame};
 use strum_macros::VariantArray;
 use crate::assembly::Register::EAX;
 use crate::stack;
-
+#[derive(Debug)]
 enum Instruction {
     Unary {
         operator: UnaryOperator,
@@ -176,7 +176,16 @@ impl Instruction {
         Ok(())
     }
 }
-#[derive(Eq, PartialEq)]
+
+macro_rules! reg {
+    ($name: ident) => {
+        Value::Register(Register::$name)
+    }
+}
+
+
+
+#[derive(Eq, PartialEq, Debug)]
 enum Value {
     Int32Literal(i32),
     Address(StackAddr),
@@ -208,14 +217,25 @@ impl Value {
     }
 }
 
-#[derive(PartialEq, Eq, Copy, Clone)]
+#[derive(PartialEq, Eq, Copy, Clone, Debug)]
 enum UnaryOperator {
     Compliment,
     Negate,
     Not
 }
 
-#[derive(PartialEq, Eq, Copy, Clone)]
+impl From<&String> for UnaryOperator {
+    fn from(value: &String) -> Self {
+        match value.as_str() {
+            "-" => UnaryOperator::Negate,
+            "!" => UnaryOperator::Not,
+            "~" => UnaryOperator::Compliment,
+            _ => panic!("Invalid UnaryOperator")
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Copy, Clone, Debug)]
 enum BinaryOperator {
     Add,
     Subtract,
@@ -227,6 +247,24 @@ enum BinaryOperator {
     LessOrEqual,
     GreaterThan,
     GreaterOrEqual,
+}
+
+impl From<&String> for BinaryOperator {
+    fn from(value: &String) -> Self {
+        match value.as_str() {
+            "+" => BinaryOperator::Add,
+            "-" => BinaryOperator::Subtract,
+            "*" => BinaryOperator::Multiply,
+            "/" => BinaryOperator::Divide,
+            "==" => BinaryOperator::Equal,
+            "!=" => BinaryOperator::NotEqual,
+            "<" => BinaryOperator::LessThan,
+            "<=" => BinaryOperator::LessOrEqual,
+            ">" => BinaryOperator::GreaterThan,
+            ">=" => BinaryOperator::GreaterOrEqual,
+            _ => panic!("Invalid BinaryOperator")
+        }
+    }
 }
 
 macro_rules! expand_registers {
@@ -348,7 +386,8 @@ impl Display for Register {
 
 
 pub fn generate_asm(ast: Program, out: BufWriter<File>) {
-
+    let tacky = create_tacky(ast);
+    println!("{tacky:?}")
 }
 
 struct LabelManager {
@@ -420,7 +459,7 @@ fn create_tacky_func(func: &Function, instructions: &mut Vec<Instruction>, label
 
 fn create_tacky_block(
     block_items: &Vec<BlockItem>,
-    instructions: &mut Vec<Instruction>,
+    instructions: &mut Vec<Instruction>, // out
     stack_frame: &mut StackFrame,
     label_manager: &mut LabelManager,
 ) {
@@ -429,8 +468,15 @@ fn create_tacky_block(
         match block_item {
             BlockItem::Statement( statement ) => create_tacky_statement(statement, instructions, stack_frame, label_manager),
             BlockItem::VarDeclaration( var_declaration ) => {
+
                 variables.push(&var_declaration.name);
                 stack_frame.reserve_var(var_declaration.name.clone(), var_declaration.var_type.get_size());
+                if var_declaration.init_value.is_some() {
+                    // I could prob optimize out the copy here but idc
+                    create_tacky_expression(var_declaration.init_value.as_ref().unwrap(), instructions, stack_frame, label_manager, Some(Value::Register(EAX)));
+
+                    instructions.push(Instruction::Copy {src: reg!(EAX), dest: Value::Address(*stack_frame.get_var(&var_declaration.name))})
+                }
             }
         }
     }
@@ -441,9 +487,66 @@ fn create_tacky_block(
 
 fn create_tacky_statement(
     statement: &Statement,
-    instructions: &mut Vec<Instruction>,
+    instructions: &mut Vec<Instruction>, // out
     stack_frame: &mut StackFrame,
     label_manager: &mut LabelManager
 ) {
-    
+    match statement {
+        Statement::Return { value } => {
+            create_tacky_expression(value, instructions, stack_frame, label_manager, Some(reg!(EAX)));
+            instructions.push(Instruction::Jump {dest: label_manager.last_ret_label()});
+        },
+        Statement::Block { items } => {
+            create_tacky_block(items, instructions, stack_frame, label_manager);
+        },
+        Statement::Expression { expression } => {
+            create_tacky_expression(expression, instructions, stack_frame, label_manager, None);
+        }
+    }
+}
+
+fn create_tacky_expression(
+    expression: &Expression,
+    instructions: &mut Vec<Instruction>, // out
+    stack_frame: &mut StackFrame,
+    label_manager: &mut LabelManager,
+    dest: Option<Value>
+) {
+    let dest = dest.unwrap_or_else(|| reg!(EAX));
+    match expression {
+        Expression::Var { name } => {
+            instructions.push(Instruction::Copy { src: Value::Address(*stack_frame.get_var(name)), dest });
+        },
+        Expression::Int32Constant { value } => {
+            instructions.push(Instruction::Copy { src: Value::Int32Literal(*value), dest });
+        },
+        Expression::VarAssignment { name, value } => {
+            // yet another prob removable copy
+            create_tacky_expression(value, instructions, stack_frame, label_manager, Some(reg!(EAX)));
+            instructions.push(Instruction::Copy { src: reg!(EAX), dest: Value::Address(*stack_frame.get_var(name)) });
+            // move value to desired dest too
+            instructions.push(Instruction::Copy { src: reg!(EAX), dest });
+        },
+        Expression::UnaryOp { target, operator } => {
+            create_tacky_expression(target, instructions, stack_frame, label_manager, Some(reg!(EAX)));
+            instructions.push(Instruction::Unary {
+                target: reg!(EAX),
+                operator: UnaryOperator::from(operator),
+                dest
+            });
+        },
+        Expression::BinaryOp { operator, left, right }  => {
+            let temp = stack_frame.reserve(4);
+            create_tacky_expression(right, instructions, stack_frame, label_manager, Some(Value::Address(temp)));
+            create_tacky_expression(left, instructions, stack_frame, label_manager, Some(reg!(EAX)));
+            instructions.push(Instruction::Binary {
+                operator: BinaryOperator::from(operator),
+                left: reg!(EAX),
+                right: Value::Address(temp),
+                dest,
+            });
+
+            stack_frame.free(temp);
+        }
+    }
 }
