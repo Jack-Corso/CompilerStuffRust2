@@ -1,6 +1,6 @@
 use std::env;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, BufWriter};
 use std::path::Path;
 use std::time::Instant;
 use crate::debugging::PrettyPrint;
@@ -25,14 +25,22 @@ fn main() -> std::io::Result<()> {
     let start_time = Instant::now();
     let res = lexing::tokenize(reader);
 
+    println!("Done Tokenizing in {}ms", start_time.elapsed().as_millis());
+
+    let start_time = Instant::now();
     let mut ast = parse(res);
     passes::validate_vars(&mut ast);
     passes::scope_vars(&mut ast);
     passes::validate_returns(&mut ast);
-    
+
+    println!("Done Generating AST in {}ms", start_time.elapsed().as_millis());
+
     ast.pretty_println(0);
 
-    println!("Done Tokenizing in {}ms", start_time.elapsed().as_millis());
+    let start_time = Instant::now();
+    assembly::generate_asm(ast, &mut BufWriter::new(File::create(out_path)?))?;
+
+    println!("Done Generating Assembly in {}ms", start_time.elapsed().as_millis());
 
     Ok(())
 }

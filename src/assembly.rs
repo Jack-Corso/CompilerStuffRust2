@@ -1,7 +1,7 @@
 use std::arch::x86_64::_bittestandset64;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::io::Write;
 use std::fs::{File, ReadDir};
 use std::io;
@@ -63,7 +63,6 @@ impl Instruction {
         Ok(())
     }
     pub fn write_to(&self, out: &mut BufWriter<File>) -> io::Result<()> {
-
         match self {
             Instruction::JumpIfZero { condition, dest } => {
                 writeln!(out, "\tcmpl {condition}, 0")?;
@@ -103,7 +102,7 @@ impl Instruction {
                 }
             },
             Instruction::StackSetup { size, func_name } => {
-                writeln!(out, ".globl _{func_name}")?;
+                writeln!(out, "\t.globl _{func_name}")?;
                 writeln!(out, "_{func_name}:")?;
                 writeln!(out, "\tpushq %rbp")?;
                 writeln!(out, "\tmovq %rsp, %rbp")?;
@@ -288,7 +287,7 @@ macro_rules! expand_registers {
 
     (enum_def: $name: ident { $($vals:tt)* } + [$($letter:ident),*] + [$($letter_no_h:ident),*]nh) => {
             paste::item! {
-                #[derive(Copy, Clone, Eq, PartialEq, strum_macros::EnumString, strum_macros::VariantArray)]
+                #[derive(Copy, Clone, Eq, PartialEq, Debug, strum_macros::EnumString, strum_macros::VariantArray)]
                 enum Register {
                     $($vals)*
                     $(
@@ -378,16 +377,28 @@ impl Register {
 
 impl Display for Register {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut string = self.to_string();
+        let mut string = format!("{:?}", self);
         string.make_ascii_lowercase();
-        write!(f, "%{}", string)
+        write!(f, "%{string}")
+
     }
 }
 
 
-pub fn generate_asm(ast: Program, out: BufWriter<File>) {
+pub fn generate_asm(ast: Program, out: &mut BufWriter<File>) -> io::Result<()> {
     let tacky = create_tacky(ast);
-    println!("{tacky:?}")
+    println!("{tacky:?}");
+
+    writeln!(out, "\t.globl WinMain")?;
+    writeln!(out, "WinMain:")?;
+    writeln!(out, "\tcall _main")?;
+    writeln!(out, "\tret")?;
+
+    for instruction in tacky {
+        instruction.write_to(out)?;
+    }
+
+    Ok(())
 }
 
 struct LabelManager {
