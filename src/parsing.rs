@@ -90,6 +90,9 @@ pub enum Expression {
     },
     Int32Constant {
         value: i32,
+    },
+    BlockExpression {
+        items: Vec<BlockItem>,
     }
 }
 
@@ -259,6 +262,19 @@ fn parse_factor(tokens: &mut TokenStack) -> Option<Expression> {
             pop_or_panic!(")", tokens, "Expected \")\" after expression");
             Some(expression)
         },
+        Token::Separator(separator) if separator == "{" => {
+            let mut index: usize = 1;
+            while (peek_or_ret!(tokens, index).content() != "}") {
+                index += 1;
+            };
+            index += 1;
+            peek_or_ret!("->", tokens, index);
+            index += 1;
+            pop_mult!(tokens, index);
+            pop_or_panic!("i32", tokens, "Expected type after '->'");
+
+
+        }
         Token::Identifier(name) => {
             tokens.pop_front();
             let var = Expression::Var { name: name.clone() };

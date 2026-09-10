@@ -57,7 +57,7 @@ pub fn tokenize(mut src: BufReader<File>) -> Vec<Token> {
         Regex::new("^\\d+").unwrap(), // int
         // TODO fix the parsing for this to allow semicolons but not consume them
         //  idk if this is possible w/out look-ahead support :( (maybe look into extern libs?)
-        Regex::new("^(?:i32|let|return|if|else|while|break|continue|for|do)").unwrap(), // keyword
+        Regex::new("^(?:i32|let|return|if|else|while|break|continue|for|do|yield)").unwrap(), // keyword
         Regex::new("^[{}();,]").unwrap(), // separator
         Regex::new("^(?:--|->|&&|\\|\\||==|!=|<=|>=|\\+=|-=|/=|\\*=|\\+\\+|[-~!+*/<>=?:])").unwrap(), // operator
         Regex::new("^\\w+").unwrap(), // identifier
