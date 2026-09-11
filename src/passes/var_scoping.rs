@@ -35,37 +35,42 @@ fn scope_vars_block(block_items: &mut Vec<BlockItem>, scope_level: u32, aliases:
 fn scope_vars_statement(statement: &mut Statement, scope_level: u32, aliases: &mut HashMap<String, Vec<String>>) {
     match statement {
         Statement::Expression { expression } => {
-            scope_vars_expression(expression, aliases);
+            scope_vars_expression(expression, aliases, scope_level);
         },
         Statement::Block { items } => {
             scope_vars_block(items, scope_level + 1, aliases);
         },
-        Statement::Return { value } => {
-            scope_vars_expression(value, aliases);
-        }
+        Statement::Return { value } | Statement::Yield { value } => {
+            if let Some(expr) = value {
+                scope_vars_expression(expr, aliases, scope_level);
+            }
+        },
     }
 }
 
-fn scope_vars_expression(expression: &mut Expression, aliases: &mut HashMap<String, Vec<String>>) {
+fn scope_vars_expression(expression: &mut Expression, aliases: &mut HashMap<String, Vec<String>>, scope_level: u32) {
     match expression {
-        Expression::Var { name } => {
+        Expression::Var { name, .. } => {
             name.replace_range(..name.len(), aliases.get(name).unwrap().last().unwrap());
         },
-        Expression::VarAssignment { name, value } => {
+        Expression::VarAssignment { name, value, .. } => {
             name.replace_range(..name.len(), aliases.get(name).unwrap().last().unwrap());
-            scope_vars_expression(value, aliases);
+            scope_vars_expression(value, aliases, scope_level);
         },
         Expression::UnaryOp { target, .. } => {
-            scope_vars_expression(target, aliases);
+            scope_vars_expression(target, aliases, scope_level);
         },
         Expression::BinaryOp {
             left,
             right,
             ..
         } => {
-            scope_vars_expression(left, aliases);
-            scope_vars_expression(right, aliases);
+            scope_vars_expression(left, aliases, scope_level);
+            scope_vars_expression(right, aliases, scope_level);
         },
+        Expression::BlockExpression { items, .. } => {
+            scope_vars_block(items, scope_level + 1, aliases);
+        }
         Expression::Int32Constant { .. } => {}
     }
 }

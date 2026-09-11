@@ -62,7 +62,7 @@ pub struct Function {
 #[derive(Clone)]
 pub enum Statement {
     Return {
-        value: Box<Expression>,
+        value: Option<Box<Expression>>,
     },
     Block {
         items: Vec<BlockItem>
@@ -71,7 +71,7 @@ pub enum Statement {
         expression: Box<Expression>,
     },
     Yield {
-        value: Box<Expression>,
+        value: Option<Box<Expression>>,
     }
 }
 #[derive(Clone)]
@@ -192,10 +192,13 @@ fn parse_statement(tokens: &mut TokenStack) -> Option<Statement> {
     let current = peek_or_ret!(tokens, 0);
     if current.content() == "return" {
         tokens.pop_front();
-        let value = parse_expression(tokens, 0).expect("Expected expression after return");
+        if tokens.get(0).unwrap().content() == ";" {
+            return Some(Statement::Return { value: None });
+        }
+        let value = parse_expression(tokens, 0).expect("Expected expression or ';' after return");
         pop_or_panic!(";", tokens, "Expected \";\" after return");
         return Some(Statement::Return {
-            value: Box::new(value),
+            value: Some(Box::new(value)),
         });
     } else if current.content() == "{" {
         tokens.pop_front();

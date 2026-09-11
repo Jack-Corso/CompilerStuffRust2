@@ -1,4 +1,4 @@
-use crate::parsing::{BlockItem, Program, Statement};
+use crate::parsing::{BlockItem, Expression, Program, Statement};
 
 pub fn validate_returns(ast: &Program) {
     for func in ast.body.iter() {
@@ -28,6 +28,10 @@ fn validate_statement(statement: &Statement) -> bool{
         Statement::Block { items } => {
             validate_block(items)
         },
-        Statement::Expression { .. } => false
+        Statement::Expression { expression: expr } if let Expression::BlockExpression { items, .. } = &**expr => {
+            validate_block(items)
+        },
+        Statement::Expression { .. } => false,
+        Statement::Yield { .. } => false,
     };
 }

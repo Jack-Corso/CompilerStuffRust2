@@ -458,7 +458,7 @@ fn create_tacky_func(func: &Function, instructions: &mut Vec<Instruction>, label
 
     let ret_label = label_manager.gen_ret_label();
 
-    create_tacky_block(&func.body, instructions, &mut stack, label_manager);
+    create_tacky_block(&func.body, instructions, &mut stack, label_manager, true);
 
     instructions.push(
         Instruction::StackCleanup {
@@ -473,23 +473,32 @@ fn create_tacky_block(
     instructions: &mut Vec<Instruction>, // out
     stack_frame: &mut StackFrame,
     label_manager: &mut LabelManager,
+    is_func: bool
 ) {
+    let end_label;
+    if is_func {
+        end_label = label_manager.gen_label("block_end");
+    } else {
+        end_label = String::new();
+    }
     let mut variables: Vec<&String> = Vec::new();
     for block_item in block_items.iter() {
         match block_item {
-            BlockItem::Statement( statement ) => create_tacky_statement(statement, instructions, stack_frame, label_manager),
-            BlockItem::VarDeclaration( var_declaration ) => {
-
+            BlockItem::Statement(statement) => create_tacky_statement(statement, instructions, stack_frame, label_manager),
+            BlockItem::VarDeclaration(var_declaration) => {
                 variables.push(&var_declaration.name);
                 stack_frame.reserve_var(var_declaration.name.clone(), var_declaration.var_type.get_size());
                 if var_declaration.init_value.is_some() {
                     // I could prob optimize out the copy here but idc
                     create_tacky_expression(var_declaration.init_value.as_ref().unwrap(), instructions, stack_frame, label_manager, Some(Value::Register(EAX)));
 
-                    instructions.push(Instruction::Copy {src: reg!(EAX), dest: Value::Address(*stack_frame.get_var(&var_declaration.name))})
+                    instructions.push(Instruction::Copy { src: reg!(EAX), dest: Value::Address(*stack_frame.get_var(&var_declaration.name)) })
                 }
             }
         }
+    }
+    if is_func {
+        instructions.push(Instruction::Label { label: end_label })
     }
     for var_name in variables {
         stack_frame.free_var(var_name);
@@ -504,14 +513,22 @@ fn create_tacky_statement(
 ) {
     match statement {
         Statement::Return { value } => {
-            create_tacky_expression(value, instructions, stack_frame, label_manager, Some(reg!(EAX)));
+            if let Some(expr) = value {
+                create_tacky_expression(expr, instructions, stack_frame, label_manager, Some(reg!(EAX)));
+            }
             instructions.push(Instruction::Jump {dest: label_manager.last_ret_label()});
         },
         Statement::Block { items } => {
-            create_tacky_block(items, instructions, stack_frame, label_manager);
+            create_tacky_block(items, instructions, stack_frame, label_manager, false);
         },
         Statement::Expression { expression } => {
             create_tacky_expression(expression, instructions, stack_frame, label_manager, None);
+        },
+        Statement::Yield { value } => {
+            if let Some(expr) = value {
+                create_tacky_expression(expr, instructions, stack_frame, label_manager, Some(reg!(EAX)));
+            }
+            instructions.push(Instruction::Jump {dest: label_manager.last_label("block_end")})
         }
     }
 }
@@ -525,20 +542,20 @@ fn create_tacky_expression(
 ) {
     let dest = dest.unwrap_or_else(|| reg!(EAX));
     match expression {
-        Expression::Var { name } => {
+        Expression::Var { name, .. } => {
             instructions.push(Instruction::Copy { src: Value::Address(*stack_frame.get_var(name)), dest });
         },
         Expression::Int32Constant { value } => {
             instructions.push(Instruction::Copy { src: Value::Int32Literal(*value), dest });
         },
-        Expression::VarAssignment { name, value } => {
+        Expression::VarAssignment { name, value, .. } => {
             // yet another prob removable copy
             create_tacky_expression(value, instructions, stack_frame, label_manager, Some(reg!(EAX)));
             instructions.push(Instruction::Copy { src: reg!(EAX), dest: Value::Address(*stack_frame.get_var(name)) });
             // move value to desired dest too
             instructions.push(Instruction::Copy { src: reg!(EAX), dest });
         },
-        Expression::UnaryOp { target, operator } => {
+        Expression::UnaryOp { target, operator, .. } => {
             create_tacky_expression(target, instructions, stack_frame, label_manager, Some(reg!(EAX)));
             instructions.push(Instruction::Unary {
                 target: reg!(EAX),
@@ -546,7 +563,7 @@ fn create_tacky_expression(
                 dest
             });
         },
-        Expression::BinaryOp { operator, left, right }  => {
+        Expression::BinaryOp { operator, left, right, .. }  => {
             let temp = stack_frame.reserve(4);
             create_tacky_expression(right, instructions, stack_frame, label_manager, Some(Value::Address(temp)));
             create_tacky_expression(left, instructions, stack_frame, label_manager, Some(reg!(EAX)));
@@ -558,6 +575,9 @@ fn create_tacky_expression(
             });
 
             stack_frame.free(temp);
+        },
+        Expression::BlockExpression { items, .. } => {
+            create_tacky_block(items, instructions, stack_frame, label_manager, false);
         }
     }
 }

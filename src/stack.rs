@@ -175,7 +175,8 @@ fn update_stack_frame_statement(stack_frame: &mut StackFrame, statement: &Statem
         },
         Statement::Return { value } => {
             update_stack_frame_expression(stack_frame, value);
-        }
+        },
+        Statement::Yield { value }
     }
 }
 
@@ -199,5 +200,6 @@ fn update_stack_frame_expression(stack_frame: &mut StackFrame, expression: &Expr
         },
         Expression::Var { .. } => {},
         Expression::Int32Constant { .. } => {},
+        
     }
 }

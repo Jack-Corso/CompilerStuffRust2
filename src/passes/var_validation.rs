@@ -36,7 +36,14 @@ fn validate_vars_statement(statement: &Statement, vars: &mut HashSet<String>) {
             validate_vars_block(items, vars);
         },
         Statement::Return { value } => {
-            validate_vars_expression(value, vars);
+            if let Some(expr) = value {
+                validate_vars_expression(expr, vars);
+            }
+        },
+        Statement::Yield { value } => {
+            if let Some(expr) = value {
+                validate_vars_expression(expr, vars);
+            }
         }
     }
 }
@@ -48,7 +55,7 @@ fn validate_vars_expression(expression: &Expression, vars: &mut HashSet<String>)
                 panic!("Variable '{}' used before definition", name);
             }
         },
-        Expression::VarAssignment { name, value } => {
+        Expression::VarAssignment { name, value, .. } => {
             if !vars.contains(name) {
                 panic!("Variable '{}' used before definition", name);
             }
@@ -67,6 +74,9 @@ fn validate_vars_expression(expression: &Expression, vars: &mut HashSet<String>)
         } => {
             validate_vars_expression(target, vars);
         },
+        Expression::BlockExpression { items, .. } => {
+            validate_vars_block(items, vars);
+        }
         Expression::Int32Constant { .. } => {}
     }
 }
