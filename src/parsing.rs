@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 use crate::lexing::Token;
-use crate::parsing::Expression::{BinaryOp, VarAssignment};
+use crate::parsing::Expression::{BinaryOp, UnaryOp, VarAssignment};
 use crate::typing::Type;
 
 macro_rules! peek_or_ret {
@@ -59,6 +59,7 @@ pub struct Function {
     pub func_type: Type
 }
 
+#[derive(Clone)]
 pub enum Statement {
     Return {
         value: Box<Expression>,
@@ -68,40 +69,63 @@ pub enum Statement {
     },
     Expression {
         expression: Box<Expression>,
+    },
+    Yield {
+        value: Box<Expression>,
     }
 }
-
+#[derive(Clone)]
 pub enum Expression {
     UnaryOp {
         operator: String,
         target: Box<Expression>,
+        expr_type: Type
     },
     BinaryOp {
         operator: String,
         left: Box<Expression>,
         right: Box<Expression>,
+        expr_type: Type
     },
     Var {
         name: String,
+        expr_type: Type,
     },
     VarAssignment {
         name: String,
         value: Box<Expression>,
+        expr_type: Type,
     },
     Int32Constant {
         value: i32,
     },
     BlockExpression {
         items: Vec<BlockItem>,
+        expr_type: Type,
     }
 }
 
+impl Expression {
+    pub fn get_type(&self) -> Type {
+        match self {
+            Expression::BinaryOp { expr_type, .. } |
+                Expression::UnaryOp { expr_type, .. } |
+                Expression::Var { expr_type, .. } |
+                Expression::VarAssignment { expr_type, .. } |
+                Expression::BlockExpression { expr_type, .. } => expr_type.clone(),
+            Expression::Int32Constant { .. } => Type::Int32,
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct VarDeclaration {
     pub name: String,
     pub init_value: Option<Expression>,
     pub var_type: Type,
 }
 
+#[derive(Clone)]
 pub enum BlockItem {
     Statement(Statement),
     VarDeclaration(VarDeclaration),
@@ -206,26 +230,33 @@ fn parse_expression(tokens: &mut TokenStack, min_precedence: usize) -> Option<Ex
                     if (is_assignment_op(operator)) { // right associative
                         let mut right = parse_expression(tokens, precedence).expect("Expected expression after assignment");
                         match (&left) {
-                            Expression::Var { name } => {
+                            Expression::Var { name, expr_type } => {
+
+
                                 if operator.len() == 2 {
                                     // get first char
                                     let extra_op = operator.strip_suffix("=").unwrap().to_string();
+
                                     right = Expression::BinaryOp {
                                         operator: extra_op,
                                         left: Box::new(right),
-                                        right: Box::new(Expression::Var { name: name.clone() }),
+                                        right: Box::new(Expression::Var { name: name.clone(), expr_type: expr_type.clone() }),
+                                        expr_type: Type::Unknown
                                     }
                                 }
-                                left = VarAssignment { name: name.clone(), value: Box::new(right) };
+                                left = VarAssignment { name: name.clone(), value: Box::new(right), expr_type: Type::Unknown };
                             },
                             _=> panic!("Expected variable name before assignment var")
                         }
                     } else {
                         let right = parse_expression(tokens, precedence).expect("Expected expression after binary op");
+
+
                         left = BinaryOp {
                             operator: operator.clone(),
                             left: Box::new(left),
                             right: Box::new(right),
+                            expr_type: Type::Unknown
                         };
                     }
                 } else {
@@ -251,10 +282,14 @@ fn parse_factor(tokens: &mut TokenStack) -> Option<Expression> {
         Token::Operator(operator) if is_unary_op(&operator) => {
             tokens.pop_front();
             let target = parse_factor(tokens).expect("Expected factor after unary operator");
+
+            let target_type = target.get_type();
             Some(Expression::UnaryOp {
                 operator: operator.clone(),
                 target: Box::new(target),
+                expr_type: target_type
             })
+
         },
         Token::Separator(separator) if separator == "(" => {
             tokens.pop_front();
@@ -264,20 +299,37 @@ fn parse_factor(tokens: &mut TokenStack) -> Option<Expression> {
         },
         Token::Separator(separator) if separator == "{" => {
             let mut index: usize = 1;
+
+            let mut block_tokens = VecDeque::new();
+
             while (peek_or_ret!(tokens, index).content() != "}") {
+                block_tokens.push_back(tokens.get(index).unwrap().clone());
                 index += 1;
             };
             index += 1;
             peek_or_ret!("->", tokens, index);
             index += 1;
             pop_mult!(tokens, index);
+
             pop_or_panic!("i32", tokens, "Expected type after '->'");
 
+            let mut items = Vec::new();
+
+            while !block_tokens.is_empty() {
+                let item = parse_block_item(&mut block_tokens).expect("Expected block item");
+                items.push(item);
+            }
+
+
+            Some(Expression::BlockExpression {
+                items,
+                expr_type: Type::Int32
+            })
 
         }
         Token::Identifier(name) => {
             tokens.pop_front();
-            let var = Expression::Var { name: name.clone() };
+            let var = Expression::Var { name: name.clone(), expr_type: Type::Unknown };
             // handle increment & decrement operators
             if !tokens.is_empty() {
                 let next_cont = tokens[0].content();
@@ -287,6 +339,7 @@ fn parse_factor(tokens: &mut TokenStack) -> Option<Expression> {
                     return Some(Expression::UnaryOp {
                         operator: modified_op,
                         target: Box::new(var),
+                        expr_type: Type::Unknown
                     });
                 }
             }
