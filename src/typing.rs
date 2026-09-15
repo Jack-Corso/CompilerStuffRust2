@@ -8,7 +8,8 @@ pub enum Type {
         param_types: Vec<Box<Type>>,
     },
     Unknown,
-    Any
+    Any,
+    Casted { from: Box<Type>, to: Box<Type> },
 }
 
 impl Type {
@@ -18,6 +19,7 @@ impl Type {
             Type::FuncType { return_type, .. } => return_type.get_size(),
             Type::Unknown => 0,
             Type::Any => 0,
+            Type::Casted { from, .. } => from.get_size()
         }
     }
     
@@ -30,8 +32,22 @@ impl Type {
             Type::Unknown => {
                 panic!("Unknown Type should not be used in a convertable check.");
             },
+            Type::Casted { to, .. } => {
+                to.is_convertable_to(other)
+            }
             Type::Any => true,
         }
+    }
+    
+    pub fn try_cast(&self, other: &Type) -> Option<Type> {
+       
+        if self.is_convertable_to(other) {
+            if self == other {
+                return Some(self.clone());
+            }
+            return Some(Type::Casted { from: Box::new(self.clone()), to: Box::new(other.clone()) });
+        }
+        return None;
     }
 }
 
@@ -44,6 +60,9 @@ impl Display for Type {
             },
             Type::Unknown => write!(f, "unknown"),
             Type::Any => write!(f, "any"),
+            Type::Casted { from, to } => {
+                write!(f, "cast[{from} -> {to}]")
+            }
         }
     }
 }

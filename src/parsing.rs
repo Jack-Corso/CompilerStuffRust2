@@ -98,6 +98,7 @@ pub enum Expression {
     },
     Int32Constant {
         value: i32,
+        expr_type: Type
     },
     BlockExpression {
         items: Vec<BlockItem>,
@@ -107,13 +108,28 @@ pub enum Expression {
 
 impl Expression {
     pub fn get_type(&self) -> Type {
+        return self.get_type_ref().clone();
+    }
+
+    pub fn get_type_ref(&self) -> &Type {
         match self {
             Expression::BinaryOp { expr_type, .. } |
-                Expression::UnaryOp { expr_type, .. } |
-                Expression::Var { expr_type, .. } |
-                Expression::VarAssignment { expr_type, .. } |
-                Expression::BlockExpression { expr_type, .. } => expr_type.clone(),
-            Expression::Int32Constant { .. } => Type::Int32,
+            Expression::UnaryOp { expr_type, .. } |
+            Expression::Var { expr_type, .. } |
+            Expression::VarAssignment { expr_type, .. } |
+            Expression::BlockExpression { expr_type, .. } |
+            Expression::Int32Constant { expr_type, .. } => &expr_type,
+        }
+    }
+
+    pub fn set_type(&mut self, new_type: Type) {
+        match self {
+            Expression::BinaryOp { expr_type, .. } |
+            Expression::UnaryOp { expr_type, .. } |
+            Expression::Var { expr_type, .. } |
+            Expression::VarAssignment { expr_type, .. } |
+            Expression::BlockExpression { expr_type, .. } |
+            Expression::Int32Constant { expr_type, .. } => *expr_type = new_type,
         }
     }
 }
@@ -280,7 +296,7 @@ fn parse_factor(tokens: &mut TokenStack) -> Option<Expression> {
         Token::Int32Literal(content) => {
             tokens.pop_front();
             let value: i32 = content.parse().unwrap();
-            Some(Expression::Int32Constant { value })
+            Some(Expression::Int32Constant { value, expr_type: Type::Int32 })
         },
         Token::Operator(operator) if is_unary_op(&operator) => {
             tokens.pop_front();
