@@ -60,9 +60,23 @@ impl PrettyPrint for Statement {
                 print!("{}}}", indent_str);
             },
             Statement::Return { value } => {
-                println!("{}Return {{", indent_str);
-                value.pretty_println(indent + 1);
-                print!("{}}}", indent_str);
+                if let Some(expr) = value {
+                    println!("{}Return {{", indent_str);
+                    expr.pretty_println(indent + 1);
+                    print!("{}}}", indent_str);
+                } else {
+                    print!("{}Return{{}}", indent_str);
+                }
+            },
+            Statement::Yield { value } => {
+                if let Some(expr) = value {
+                    println!("{}Yield {{", indent_str);
+                    expr.pretty_println(indent + 1);
+                    print!("{}}}", indent_str);
+                } else {
+                    print!("{}Yield{{}}", indent_str);
+                }
+
             }
         }
     }
@@ -72,15 +86,15 @@ impl PrettyPrint for Expression {
     fn pretty_print(&self, indent: usize) {
         let indent_str = indent_string(indent);
         match self {
-            Expression::Var { name } => {
+            Expression::Var { name, .. } => {
                 print!("{}Var[\"{}\"]", indent_str, name);
             },
-            Expression::UnaryOp { operator, target } => {
+            Expression::UnaryOp { operator, target, .. } => {
                 println!("{}UnaryOp[\"{}\"] {{", indent_str, operator);
                 target.pretty_println(indent + 1);
                 print!("{}}}", indent_str);
             },
-            Expression::VarAssignment { name, value } => {
+            Expression::VarAssignment { name, value, .. } => {
                 println!("{}VarAssign[\"{}\"] {{", indent_str, name);
                 value.pretty_println(indent + 1);
                 print!("{}}}", indent_str);
@@ -88,7 +102,8 @@ impl PrettyPrint for Expression {
             Expression::BinaryOp {
                 operator,
                 left,
-                right
+                right,
+                ..
             } => {
                 println!("{}BinaryOp[\"{}\"] {{", indent_str, operator);
                 println!("\t{}left=>{{", indent_str);
@@ -99,6 +114,13 @@ impl PrettyPrint for Expression {
             },
             Expression::Int32Constant { value } => {
                 print!("{}Int32Constant[\"{}\"]", indent_str, value);
+            },
+            Expression::BlockExpression { items, .. } => {
+                println!("{}BlockExpression {{", indent_str);
+                for item in items.iter() {
+                    item.pretty_println(indent+1);
+                }
+                print!("{}}}", indent_str);
             }
         };
     }

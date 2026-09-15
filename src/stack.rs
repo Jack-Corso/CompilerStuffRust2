@@ -173,10 +173,11 @@ fn update_stack_frame_statement(stack_frame: &mut StackFrame, statement: &Statem
         Statement::Block { items } => {
             update_stack_frame_block(stack_frame, items);
         },
-        Statement::Return { value } => {
-            update_stack_frame_expression(stack_frame, value);
+        Statement::Return { value } | Statement::Yield { value } => {
+            if let Some(expr) = value {
+                update_stack_frame_expression(stack_frame, expr);
+            }
         },
-        Statement::Yield { value }
     }
 }
 
@@ -200,6 +201,9 @@ fn update_stack_frame_expression(stack_frame: &mut StackFrame, expression: &Expr
         },
         Expression::Var { .. } => {},
         Expression::Int32Constant { .. } => {},
+        Expression::BlockExpression { items, .. } => {
+            update_stack_frame_block(stack_frame, items);
+        }
         
     }
 }
