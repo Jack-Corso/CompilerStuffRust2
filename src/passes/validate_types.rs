@@ -63,6 +63,14 @@ fn validate_types_statement(statement: &mut Statement, return_type: Option<&Type
 }
 
 fn validate_types_expression(expression: &mut Expression, return_type: Option<&Type>, expected_type: &Type) {
-
+    match expression {
+        Expression::BlockExpression { items, expr_type } => {
+            validate_types_block(items, return_type, Some(&expr_type));
+        },
+        _ => {
+            assert!(expression.get_type_ref().is_convertable_to(expected_type), "Expected type {}, got {}", expected_type, expression.get_type_ref());
+            expression.set_type(expression.get_type_ref().try_cast(expected_type).unwrap())
+        }
+    }
 }
 

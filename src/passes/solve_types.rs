@@ -16,7 +16,7 @@ pub fn solve_types(ast: &mut Program) {
     }
 }
 
-pub fn solve_types_block(items: &mut Vec<BlockItem>, ident_types: &mut HashMap<String, Type>) {
+fn solve_types_block(items: &mut Vec<BlockItem>, ident_types: &mut HashMap<String, Type>) {
     for item in items {
         match item {
             BlockItem::Statement(statement) => {
@@ -64,8 +64,10 @@ fn solve_types_expression(expression: &mut Expression, ident_types: &mut HashMap
             solve_types_expression(right, ident_types);
             if left.get_type_ref().is_convertable_to(right.get_type_ref()) {
                 left.set_type(left.get_type_ref().try_cast(right.get_type_ref()).unwrap());
+                *expr_type = right.get_type();
             } else if right.get_type_ref().is_convertable_to(&left.get_type_ref()) {
                 right.set_type(right.get_type_ref().try_cast(left.get_type_ref()).unwrap());
+                *expr_type = left.get_type();
             } else {
                 panic!("Operator '{operator}' cannot be applied to {} and {}", left.get_type_ref(), right.get_type_ref());
             }

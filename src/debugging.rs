@@ -112,7 +112,7 @@ impl PrettyPrint for Expression {
                 right.pretty_println(indent + 2);
                 print!("\t{t}}}\n{t}}}", t=indent_str);
             },
-            Expression::Int32Constant { value } => {
+            Expression::Int32Constant { value, .. } => {
                 print!("{}Int32Constant[\"{}\"]", indent_str, value);
             },
             Expression::BlockExpression { items, .. } => {

@@ -1,5 +1,7 @@
 func main() -> i32 {
-    let i: i32 = 0;
+    let i: i32 = {
+        yield 0 + 25;
+    } -> i32;
 
     return i;
 }

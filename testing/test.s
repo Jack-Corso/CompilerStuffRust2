@@ -6,8 +6,12 @@ WinMain:
 _main:
 	pushq %rbp
 	movq %rsp, %rbp
-	subq $4, %rsp
+	subq $8, %rsp
+	movl $25, -8(%rbp)
 	movl $0, %eax
+	addl -8(%rbp), %eax
+	jmp block_end0
+block_end0:
 	movl %eax, -4(%rbp)
 	movl -4(%rbp), %eax
 	jmp return0

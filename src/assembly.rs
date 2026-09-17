@@ -476,7 +476,7 @@ fn create_tacky_block(
     is_func: bool
 ) {
     let end_label;
-    if is_func {
+    if !is_func {
         end_label = label_manager.gen_label("block_end");
     } else {
         end_label = String::new();
@@ -497,7 +497,7 @@ fn create_tacky_block(
             }
         }
     }
-    if is_func {
+    if !is_func {
         instructions.push(Instruction::Label { label: end_label })
     }
     for var_name in variables {
@@ -545,7 +545,7 @@ fn create_tacky_expression(
         Expression::Var { name, .. } => {
             instructions.push(Instruction::Copy { src: Value::Address(*stack_frame.get_var(name)), dest });
         },
-        Expression::Int32Constant { value } => {
+        Expression::Int32Constant { value, .. } => {
             instructions.push(Instruction::Copy { src: Value::Int32Literal(*value), dest });
         },
         Expression::VarAssignment { name, value, .. } => {

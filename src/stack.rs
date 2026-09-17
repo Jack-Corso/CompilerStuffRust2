@@ -20,8 +20,10 @@ impl StackFrame {
     }
 
     pub fn alloc(&mut self, size: usize) {
-        let addr = StackAddr::new(self.size, size);
+        //println!("Allocated {size}");
         self.size += size;
+        // println!("Alloc called");
+        let addr = StackAddr::new(self.size, size);
         if !self.free_mem.contains_key(&size) {
             self.free_mem.insert(size, Vec::new());
         }
@@ -39,6 +41,7 @@ impl StackFrame {
     }
 
     pub fn reserve(&mut self, size: usize) -> StackAddr {
+        //println!("Reserved {size}");
         let error_msg = "No available stack mem with the given size";
         return self.free_mem.get_mut(&size).expect(error_msg).pop().expect(error_msg);
     }
@@ -47,8 +50,8 @@ impl StackFrame {
         if self.var_map.contains_key(&name) {
             panic!("Variable {name} already exists in this scope");
         }
-        let addr = StackAddr::new(self.size, size);
-        self.size += size;
+        let addr = self.reserve(size);
+        // self.size += size;
         self.var_map.insert(name.clone(), addr);
         return self.var_map.get(&name).unwrap();
     }
@@ -59,10 +62,12 @@ impl StackFrame {
 
     pub fn free_var(&mut self, name: &String) {
         let addr = self.var_map.remove(name).expect("Tried freeing var that doesn't exist");
-        self.free_mem.get_mut(&addr.size).unwrap().push(addr);
+        self.free(addr);
+        //self.free_mem.get_mut(&addr.size).unwrap().push(addr);
     }
 
     pub fn free(&mut self, addr: StackAddr) {
+        //println!("Freed {}", addr.size);
         if addr.is_view {
             panic!("Cannot free a view of an address");
         }
@@ -140,9 +145,10 @@ impl StackAddr {
 }
 
 pub fn create_stack_frame(func: &Function) -> StackFrame {
+    //println!("Creating stack frame");
     let mut stack_frame = StackFrame::new();
     update_stack_frame_block(&mut stack_frame, &func.body);
-
+    //println!("Done");
     stack_frame
 }
 
@@ -157,6 +163,9 @@ fn update_stack_frame_block(stack_frame: &mut StackFrame, block_items: &Vec<Bloc
                 let var_size = var_declaration.var_type.get_size();
                 stack_frame.alloc_if_missing(var_size);
                 scope_vars.push(stack_frame.reserve(var_size));
+                if var_declaration.init_value.is_some() {
+                    update_stack_frame_expression(stack_frame, var_declaration.init_value.as_ref().unwrap());
+                }
             }
         }
     }
@@ -192,6 +201,7 @@ fn update_stack_frame_expression(stack_frame: &mut StackFrame, expression: &Expr
             stack_frame.alloc_if_missing(4);
             let temp_addr = stack_frame.reserve(4);
             update_stack_frame_expression(stack_frame, left);
+            stack_frame.free(temp_addr);
         },
         Expression::VarAssignment { value, .. } => {
             update_stack_frame_expression(stack_frame, value);

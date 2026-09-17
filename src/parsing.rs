@@ -227,6 +227,16 @@ fn parse_statement(tokens: &mut TokenStack) -> Option<Statement> {
         return Some(Statement::Block {
             items: block_items,
         });
+    } else if current.content() == "yield" {
+        tokens.pop_front();
+        if tokens.get(0).unwrap().content() == ";" {
+            return Some(Statement::Yield { value: None });
+        }
+        let value = parse_expression(tokens, 0).expect("Expected expression or ';' after yield");
+        pop_or_panic!(";", tokens, "Expected \";\" after yield");
+        return Some(Statement::Yield {
+            value: Some(Box::new(value)),
+        });
     }
     None
 }
@@ -333,6 +343,8 @@ fn parse_factor(tokens: &mut TokenStack) -> Option<Expression> {
             pop_or_panic!("i32", tokens, "Expected type after '->'");
 
             let mut items = Vec::new();
+
+            println!("{block_tokens:?}");
 
             while !block_tokens.is_empty() {
                 let item = parse_block_item(&mut block_tokens).expect("Expected block item");

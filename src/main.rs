@@ -32,6 +32,8 @@ fn main() -> std::io::Result<()> {
     passes::validate_vars(&mut ast);
     passes::scope_vars(&mut ast);
     passes::validate_returns(&mut ast);
+    passes::solve_types(&mut ast);
+    passes::validate_types(&mut ast);
 
     println!("Done Generating AST in {}ms", start_time.elapsed().as_millis());
 
