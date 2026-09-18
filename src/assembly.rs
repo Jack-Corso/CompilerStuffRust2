@@ -77,7 +77,14 @@ impl Instruction {
             },
             Instruction::Copy { src, dest } => {
                 if src != dest {
-                    writeln!(out, "\tmovl {src}, {dest}")?;
+                    if matches!(src, Value::Address( .. )) && matches!(dest, Value::Address( .. )) {
+                        // needs intermediate
+                        writeln!(out, "\tmovl {src}, %ecx")?;
+                        writeln!(out, "\tmovl %ecx, {dest}")?;
+                    } else {
+                        writeln!(out, "\tmovl {src}, {dest}")?;
+                    }
+
                 }
             },
             Instruction::Unary { operator, target, dest } => {

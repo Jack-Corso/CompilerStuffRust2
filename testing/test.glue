@@ -1,7 +1,14 @@
 func main() -> i32 {
-    let i: i32 = {
-        yield 0 + 25;
+
+    let b: i32 = {
+        let i: i32 = 5;
+        i += 5 / 2;
+        yield i;
     } -> i32;
 
-    return i;
+    b /= 2;
+
+
+    return b;
+
 }

@@ -24,6 +24,9 @@ impl Type {
     }
     
     pub fn is_convertable_to(&self, other: &Type) -> bool {
+        if matches!(other, Type::Any) {
+            return true;
+        }
         match &self {
             Type::Int32 => matches!(other, Type::Int32),
             Type::FuncType { return_type, param_types } => {

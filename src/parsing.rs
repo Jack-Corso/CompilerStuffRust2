@@ -268,8 +268,8 @@ fn parse_expression(tokens: &mut TokenStack, min_precedence: usize) -> Option<Ex
 
                                     right = Expression::BinaryOp {
                                         operator: extra_op,
-                                        left: Box::new(right),
-                                        right: Box::new(Expression::Var { name: name.clone(), expr_type: expr_type.clone() }),
+                                        left: Box::new(Expression::Var { name: name.clone(), expr_type: expr_type.clone() }),
+                                        right: Box::new(right),
                                         expr_type: Type::Unknown
                                     }
                                 }
