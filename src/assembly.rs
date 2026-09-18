@@ -394,7 +394,7 @@ impl Display for Register {
 
 pub fn generate_asm(ast: Program, out: &mut BufWriter<File>) -> io::Result<()> {
     let tacky = create_tacky(ast);
-    println!("{tacky:?}");
+    println!("{}", tacky.iter().map(|i| format!("{i:?}")).collect::<Vec<String>>().join("\n"));
 
     writeln!(out, "\t.globl WinMain")?;
     writeln!(out, "WinMain:")?;
@@ -491,7 +491,7 @@ fn create_tacky_block(
     let mut variables: Vec<&String> = Vec::new();
     for block_item in block_items.iter() {
         match block_item {
-            BlockItem::Statement(statement) => create_tacky_statement(statement, instructions, stack_frame, label_manager),
+            BlockItem::Statement(statement) => create_tacky_statement(statement, instructions, stack_frame, label_manager, &end_label),
             BlockItem::VarDeclaration(var_declaration) => {
                 variables.push(&var_declaration.name);
                 stack_frame.reserve_var(var_declaration.name.clone(), var_declaration.var_type.get_size());
@@ -516,7 +516,8 @@ fn create_tacky_statement(
     statement: &Statement,
     instructions: &mut Vec<Instruction>, // out
     stack_frame: &mut StackFrame,
-    label_manager: &mut LabelManager
+    label_manager: &mut LabelManager,
+    block_end: &String,
 ) {
     match statement {
         Statement::Return { value } => {
@@ -535,7 +536,7 @@ fn create_tacky_statement(
             if let Some(expr) = value {
                 create_tacky_expression(expr, instructions, stack_frame, label_manager, Some(reg!(EAX)));
             }
-            instructions.push(Instruction::Jump {dest: label_manager.last_label("block_end")})
+            instructions.push(Instruction::Jump {dest: block_end.clone()});
         }
     }
 }

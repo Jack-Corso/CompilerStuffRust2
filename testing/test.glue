@@ -6,7 +6,18 @@ func main() -> i32 {
         yield i;
     } -> i32;
 
-    b /= 2;
+    {
+        let c: i32 = 2;
+         b /= c;
+         {
+            c += 35 -2;
+            b *= c;
+            yield;
+            b += 1;
+         }
+         yield;
+         b += 1;
+    }
 
 
     return b;

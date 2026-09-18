@@ -72,7 +72,8 @@ pub enum Statement {
     },
     Yield {
         value: Option<Box<Expression>>,
-    }
+    },
+
 }
 #[derive(Clone)]
 pub enum Expression {
@@ -224,12 +225,14 @@ fn parse_statement(tokens: &mut TokenStack) -> Option<Statement> {
             block_items.push(parse_block_item(&mut *tokens).expect("Unexpected token sequence"));
             next = tokens.front().expect("Expected \"}\" to close block");
         }
+        tokens.pop_front();
         return Some(Statement::Block {
             items: block_items,
         });
     } else if current.content() == "yield" {
         tokens.pop_front();
         if tokens.get(0).unwrap().content() == ";" {
+            tokens.pop_front();
             return Some(Statement::Yield { value: None });
         }
         let value = parse_expression(tokens, 0).expect("Expected expression or ';' after yield");

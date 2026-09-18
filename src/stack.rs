@@ -20,7 +20,7 @@ impl StackFrame {
     }
 
     pub fn alloc(&mut self, size: usize) {
-        //println!("Allocated {size}");
+       // println!("Allocated {size}");
         self.size += size;
         // println!("Alloc called");
         let addr = StackAddr::new(self.size, size);
@@ -197,9 +197,9 @@ fn update_stack_frame_expression(stack_frame: &mut StackFrame, expression: &Expr
             right,
             ..
         } => {
-            update_stack_frame_expression(stack_frame, right);
             stack_frame.alloc_if_missing(4);
             let temp_addr = stack_frame.reserve(4);
+            update_stack_frame_expression(stack_frame, right);
             update_stack_frame_expression(stack_frame, left);
             stack_frame.free(temp_addr);
         },
