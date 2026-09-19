@@ -1,5 +1,7 @@
 func main() -> i32 {
 
+    let i: i32 = 250;
+
     let b: i32 = {
         let i: i32 = 5;
         i += 5 / 2;
@@ -10,7 +12,7 @@ func main() -> i32 {
         let c: i32 = 2;
          b /= c;
          {
-            c += 35 -2;
+            c += 35 - 2;
             b *= c;
             yield;
             b += 1;

@@ -125,26 +125,27 @@ impl Instruction {
                 writeln!(out, "{label}:")?;
             },
             Instruction::Binary { operator, left, right, dest } => {
+
                 if *operator == BinaryOperator::Divide {
                     Self::move_if_needed(left, &Value::Register(Register::EAX), out)?;
                     writeln!(out, "\tcdq")?;
                     writeln!(out, "\tidiv {right}")?;
                     Self::move_if_needed(&Value::Register(Register::EAX), dest, out)?;
                 } else {
-                    Self::move_if_needed(left, dest, out)?;
+
                     macro_rules! cmp_and_clear {
                         () => {
                             {
-                                writeln!(out, "\tcmpl {right}, {dest}")?;
+                                writeln!(out, "\tcmpl {right}, {left}")?;
                                 writeln!(out, "movl $0, {dest}")?;
                                 dest.get_n_byte_view(1)
                             }
                         };
                     }
                     match operator {
-                        BinaryOperator::Add => writeln!(out, "\taddl {right}, {dest}")?,
-                        BinaryOperator::Subtract => writeln!(out, "\tsubl {right}, {dest}")?,
-                        BinaryOperator::Multiply => writeln!(out, "\timull {right}, {dest}")?,
+                        BinaryOperator::Add => writeln!(out, "\taddl {right}, {left}")?,
+                        BinaryOperator::Subtract => writeln!(out, "\tsubl {right}, {left}")?,
+                        BinaryOperator::Multiply => writeln!(out, "\timull {right}, {left}")?,
 
                         BinaryOperator::Equal => {
                             // technically an extra move idc tho lowkey
@@ -175,6 +176,7 @@ impl Instruction {
                         },
                         BinaryOperator::Divide => unreachable!(),
                     }
+                    Self::move_if_needed(left, dest, out)?;
                 }
 
             }
