@@ -43,6 +43,9 @@ fn solve_types_statement(statement: &mut Statement, ident_types: &mut HashMap<St
         },
         Statement::Block { items } => {
             solve_types_block(items, ident_types);
+        },
+        Statement::If { condition, on_true, on_false } => {
+            solve_types_expression()
         }
     }
 }

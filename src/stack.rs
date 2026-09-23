@@ -187,6 +187,13 @@ fn update_stack_frame_statement(stack_frame: &mut StackFrame, statement: &Statem
                 update_stack_frame_expression(stack_frame, expr);
             }
         },
+        Statement::If { condition, on_true, on_false } => {
+            update_stack_frame_expression(stack_frame, condition);
+            update_stack_frame_statement(stack_frame, on_true);
+            if let Some(false_branch) = on_false {
+                update_stack_frame_statement(stack_frame, false_branch);
+            }
+        }
     }
 }
 

@@ -4,7 +4,7 @@ use std::io::{BufReader, BufWriter};
 use std::path::Path;
 use std::time::Instant;
 use crate::debugging::PrettyPrint;
-use crate::parsing::parse;
+use crate::parsing::{parse, Program};
 
 mod lexing;
 mod parsing;

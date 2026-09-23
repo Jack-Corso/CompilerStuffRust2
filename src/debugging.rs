@@ -77,6 +77,18 @@ impl PrettyPrint for Statement {
                     print!("{}Yield{{}}", indent_str);
                 }
 
+            },
+            Statement::If { condition, on_true, on_false } => {
+                println!("{indent_str}If {{");
+                println!("{indent_str}\tcond=>");
+                condition.pretty_println(indent + 1);
+                println!("{indent_str}\ton_true=>");
+                on_true.pretty_println(indent + 1);
+                if let Some(on_false) = on_false {
+                    println!("{indent_str}\ton_false=>");
+                    on_false.pretty_println(indent + 1);
+                }
+                print!("{indent_str}}}");
             }
         }
     }

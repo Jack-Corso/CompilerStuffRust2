@@ -73,6 +73,11 @@ pub enum Statement {
     Yield {
         value: Option<Box<Expression>>,
     },
+    If {
+        condition: Box<Expression>,
+        on_true: Box<Statement>,
+        on_false: Option<Box<Statement>>,
+    }
 
 }
 #[derive(Clone)]
@@ -240,6 +245,27 @@ fn parse_statement(tokens: &mut TokenStack) -> Option<Statement> {
         return Some(Statement::Yield {
             value: Some(Box::new(value)),
         });
+    } else if current.content() == "if" {
+        tokens.pop_front();
+        pop_or_panic!("(", tokens, "Expected \"(\" after \"if\"");
+        let condition = parse_expression(tokens, 0).expect("Expected expression after \"if\"");
+        pop_or_panic!(")", tokens, "Expected \")\" after expression");
+        let on_true = parse_statement(tokens).expect("Expected statement after \"if\"");
+        return if tokens.get(0).is_some() && tokens.get(0).unwrap().content() == "else" {
+            tokens.pop_front();
+            let on_false = parse_statement(tokens).expect("Expected statement after \"else\"");
+            Some(Statement::If {
+                condition: Box::new(condition),
+                on_true: Box::new(on_true),
+                on_false: Some(Box::new(on_false))
+            })
+        } else {
+            Some(Statement::If {
+                condition: Box::new(condition),
+                on_true: Box::new(on_true),
+                on_false: None
+            })
+        }
     }
     None
 }
