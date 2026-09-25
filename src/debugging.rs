@@ -133,6 +133,23 @@ impl PrettyPrint for Expression {
                     item.pretty_println(indent+1);
                 }
                 print!("{}}}", indent_str);
+            },
+            Expression::IfExpression {
+                condition,
+                on_true,
+                on_false,
+                ..
+            } => {
+                println!("{}IfExpr {{", indent_str);
+                println!("{indent_str}\tcond=>");
+                condition.pretty_println(indent + 1);
+                println!("{indent_str}\ton_true=>");
+                on_true.pretty_println(indent + 1);
+                if let Some(on_false) = on_false {
+                    println!("{indent_str}\ton_false=>");
+                    on_false.pretty_println(indent + 1);
+                }
+                print!("{indent_str}}}");
             }
         };
     }

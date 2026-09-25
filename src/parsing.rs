@@ -77,7 +77,7 @@ pub enum Statement {
         condition: Box<Expression>,
         on_true: Box<Statement>,
         on_false: Option<Box<Statement>>,
-    }
+    },
 
 }
 #[derive(Clone)]
@@ -109,7 +109,13 @@ pub enum Expression {
     BlockExpression {
         items: Vec<BlockItem>,
         expr_type: Type,
-    }
+    },
+    IfExpression {
+        condition: Box<Expression>,
+        on_true: Box<Expression>,
+        on_false: Option<Box<Expression>>,
+        expr_type: Type,
+    },
 }
 
 impl Expression {
@@ -124,7 +130,9 @@ impl Expression {
             Expression::Var { expr_type, .. } |
             Expression::VarAssignment { expr_type, .. } |
             Expression::BlockExpression { expr_type, .. } |
+            Expression::IfExpression { expr_type, .. } |
             Expression::Int32Constant { expr_type, .. } => &expr_type,
+
         }
     }
 
@@ -135,6 +143,7 @@ impl Expression {
             Expression::Var { expr_type, .. } |
             Expression::VarAssignment { expr_type, .. } |
             Expression::BlockExpression { expr_type, .. } |
+            Expression::IfExpression { expr_type, .. } |
             Expression::Int32Constant { expr_type, .. } => *expr_type = new_type,
         }
     }

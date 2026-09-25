@@ -45,7 +45,11 @@ fn solve_types_statement(statement: &mut Statement, ident_types: &mut HashMap<St
             solve_types_block(items, ident_types);
         },
         Statement::If { condition, on_true, on_false } => {
-            solve_types_expression()
+            solve_types_expression(condition, ident_types);
+            solve_types_statement(on_true, ident_types);
+            if let Some(statement) = on_false {
+                solve_types_statement(statement, ident_types);
+            }
         }
     }
 }
@@ -95,6 +99,25 @@ fn solve_types_expression(expression: &mut Expression, ident_types: &mut HashMap
         Expression::Int32Constant { expr_type, .. } => {
             *expr_type = Type::Int32;
         },
+        Expression::IfExpression { expr_type, condition, on_true, on_false } => {
+            if !matches!(expr_type, Type::Unknown) {
+                return;
+            }
+            solve_types_expression(condition, ident_types);
+            solve_types_expression(on_true, ident_types);
+            if let Some(expression) = on_false {
+                solve_types_expression(expression, ident_types);
+                if let Some(casted) = Type::try_cast(on_true.get_type_ref(), expression.get_type_ref()) {
+                    *expr_type = casted;
+                } else if let Some(casted) = Type::try_cast(expression.get_type_ref(), on_true.get_type_ref()) {
+                    *expr_type = casted;
+                } else {
+                    panic!("If and Else branches must have shared types, got: {} & {}", on_true.get_type_ref(), expression.get_type_ref());
+                }
+            } else {
+                *expr_type = on_true.get_type();
+            }
+        }
     }
 }
 

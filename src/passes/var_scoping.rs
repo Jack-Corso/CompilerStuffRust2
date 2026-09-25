@@ -45,6 +45,13 @@ fn scope_vars_statement(statement: &mut Statement, scope_level: u32, aliases: &m
                 scope_vars_expression(expr, aliases, scope_level);
             }
         },
+        Statement::If { condition, on_true, on_false } => {
+            scope_vars_expression(condition, aliases, scope_level);
+            scope_vars_statement(on_true, scope_level, aliases);
+            if let Some(statement) = on_false {
+                scope_vars_statement(statement, scope_level, aliases);
+            }
+        }
     }
 }
 
@@ -71,6 +78,13 @@ fn scope_vars_expression(expression: &mut Expression, aliases: &mut HashMap<Stri
         Expression::BlockExpression { items, .. } => {
             scope_vars_block(items, scope_level + 1, aliases);
         }
-        Expression::Int32Constant { .. } => {}
+        Expression::Int32Constant { .. } => {},
+        Expression::IfExpression { on_true, on_false, condition, .. } => {
+            scope_vars_expression(condition, aliases, scope_level);
+            scope_vars_expression(on_true, aliases, scope_level);
+            if let Some(expression) = on_false {
+                scope_vars_expression(expression, aliases, scope_level);
+            }
+        }
     }
 }

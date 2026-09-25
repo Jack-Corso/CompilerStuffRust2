@@ -539,7 +539,20 @@ fn create_tacky_statement(
                 create_tacky_expression(expr, instructions, stack_frame, label_manager, Some(reg!(EAX)));
             }
             instructions.push(Instruction::Jump {dest: block_end.clone()});
-        }
+        },
+        Statement::If { condition, on_true, on_false } => {
+            create_tacky_expression(condition, instructions, stack_frame, label_manager, Some(reg!(EAX)));
+            let else_label = label_manager.gen_label("elsebranch");
+            let end_label = label_manager.gen_label("ifend");
+            instructions.push(Instruction::JumpIfZero { condition: reg!(EAX), dest: else_label.clone() });
+            create_tacky_statement(on_true, instructions, stack_frame, label_manager, block_end);
+            instructions.push(Instruction::Jump { dest: end_label.clone() });
+            instructions.push(Instruction::Label { label: else_label });
+            if let Some(on_false) = on_false {
+                create_tacky_statement(on_false, instructions, stack_frame, label_manager, block_end);
+            }
+            instructions.push(Instruction::Label { label: end_label });
+        },
     }
 }
 

@@ -37,5 +37,8 @@ fn validate_statement(statement: &Statement, in_block: bool) -> bool{
         },
         Statement::Expression { .. } => !in_block,
         Statement::Yield { .. } => in_block,
+        Statement::If { on_true, on_false: Some( statement ), ..  } => 
+            validate_statement(statement, in_block) && validate_statement(on_true, in_block),
+        Statement::If { .. } => !in_block,
     };
 }

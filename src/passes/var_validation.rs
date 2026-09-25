@@ -44,6 +44,13 @@ fn validate_vars_statement(statement: &Statement, vars: &mut HashSet<String>) {
             if let Some(expr) = value {
                 validate_vars_expression(expr, vars);
             }
+        },
+        Statement::If { condition, on_true, on_false } => {
+            validate_vars_expression(condition, vars);
+            validate_vars_statement(on_true, vars);
+            if let Some(statement) = on_false {
+                validate_vars_statement(statement, vars);
+            }
         }
     }
 }
@@ -77,6 +84,13 @@ fn validate_vars_expression(expression: &Expression, vars: &mut HashSet<String>)
         Expression::BlockExpression { items, .. } => {
             validate_vars_block(items, vars);
         }
-        Expression::Int32Constant { .. } => {}
+        Expression::Int32Constant { .. } => {},
+        Expression::IfExpression { condition, on_true, on_false, .. } => {
+            validate_vars_expression(condition, vars);
+            validate_vars_expression(on_true, vars);
+            if let Some(expression) = on_false {
+                validate_vars_expression(expression, vars);
+            }
+        }
     }
 }

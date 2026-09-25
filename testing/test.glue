@@ -21,6 +21,15 @@ func main() -> i32 {
          b += 1;
     }
 
+    if (b) {
+        b = 0;
+    }
+
+    if (b) {
+        b = 100;
+    } else {
+        b = 3;
+    }
 
     return b;
 

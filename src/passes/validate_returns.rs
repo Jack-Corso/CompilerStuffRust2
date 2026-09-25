@@ -33,5 +33,8 @@ fn validate_statement(statement: &Statement) -> bool{
         },
         Statement::Expression { .. } => false,
         Statement::Yield { .. } => false,
+        Statement::If { on_true, on_false: Some(statement), .. } =>
+            validate_statement(statement) && validate_statement(on_true),
+        Statement::If { .. } => false,
     };
 }

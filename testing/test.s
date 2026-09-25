@@ -56,6 +56,27 @@ block_end2:
 	movl %eax, -4(%rbp)
 block_end1:
 	movl -4(%rbp), %eax
+	cmpl %eax, 0
+	je elsebranch0
+	movl $0, %eax
+	movl %eax, -4(%rbp)
+block_end3:
+	jmp ifend0
+elsebranch0:
+ifend0:
+	movl -4(%rbp), %eax
+	cmpl %eax, 0
+	je elsebranch1
+	movl $100, %eax
+	movl %eax, -4(%rbp)
+block_end4:
+	jmp ifend1
+elsebranch1:
+	movl $3, %eax
+	movl %eax, -4(%rbp)
+block_end5:
+ifend1:
+	movl -4(%rbp), %eax
 	jmp return0
 return0:
 	movq %rbp, %rsp

@@ -58,6 +58,13 @@ fn validate_types_statement(statement: &mut Statement, return_type: Option<&Type
         },
         Statement::Block { items } => {
             validate_types_block(items, return_type, None);
+        },
+        Statement::If { condition, on_true, on_false } => {
+            validate_types_expression(condition, return_type, &Type::Int32);
+            validate_types_statement(on_true, return_type, yield_type);
+            if let Some(statement) = on_false {
+                validate_types_statement(statement, return_type, yield_type);
+            }
         }
     }
 }

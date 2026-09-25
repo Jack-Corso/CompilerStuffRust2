@@ -220,6 +220,13 @@ fn update_stack_frame_expression(stack_frame: &mut StackFrame, expression: &Expr
         Expression::Int32Constant { .. } => {},
         Expression::BlockExpression { items, .. } => {
             update_stack_frame_block(stack_frame, items);
+        },
+        Expression::IfExpression { condition, on_true, on_false, .. } => {
+            update_stack_frame_expression(stack_frame, condition);
+            update_stack_frame_expression(stack_frame, on_true);
+            if let Some(false_branch) = on_false {
+                update_stack_frame_expression(stack_frame, false_branch);
+            }
         }
         
     }
