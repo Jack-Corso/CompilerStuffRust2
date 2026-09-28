@@ -79,12 +79,5 @@ fn scope_vars_expression(expression: &mut Expression, aliases: &mut HashMap<Stri
             scope_vars_block(items, scope_level + 1, aliases);
         }
         Expression::Int32Constant { .. } => {},
-        Expression::IfExpression { on_true, on_false, condition, .. } => {
-            scope_vars_expression(condition, aliases, scope_level);
-            scope_vars_expression(on_true, aliases, scope_level);
-            if let Some(expression) = on_false {
-                scope_vars_expression(expression, aliases, scope_level);
-            }
-        }
     }
 }

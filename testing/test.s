@@ -6,7 +6,7 @@ WinMain:
 _main:
 	pushq %rbp
 	movq %rsp, %rbp
-	subq $20, %rsp
+	subq $32, %rsp
 	movl $250, %eax
 	movl %eax, -8(%rbp)
 	movl $5, %eax
@@ -56,7 +56,7 @@ block_end2:
 	movl %eax, -4(%rbp)
 block_end1:
 	movl -4(%rbp), %eax
-	cmpl %eax, 0
+	cmpl $0, %eax
 	je elsebranch0
 	movl $0, %eax
 	movl %eax, -4(%rbp)
@@ -65,17 +65,19 @@ block_end3:
 elsebranch0:
 ifend0:
 	movl -4(%rbp), %eax
-	cmpl %eax, 0
+	cmpl $0, %eax
 	je elsebranch1
 	movl $100, %eax
-	movl %eax, -4(%rbp)
-block_end4:
+	jmp block_end5
+block_end5:
 	jmp ifend1
 elsebranch1:
 	movl $3, %eax
-	movl %eax, -4(%rbp)
-block_end5:
+	jmp block_end6
+block_end6:
 ifend1:
+block_end4:
+	movl %eax, -4(%rbp)
 	movl -4(%rbp), %eax
 	jmp return0
 return0:

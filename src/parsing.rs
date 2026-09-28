@@ -110,12 +110,6 @@ pub enum Expression {
         items: Vec<BlockItem>,
         expr_type: Type,
     },
-    IfExpression {
-        condition: Box<Expression>,
-        on_true: Box<Expression>,
-        on_false: Option<Box<Expression>>,
-        expr_type: Type,
-    },
 }
 
 impl Expression {
@@ -130,7 +124,6 @@ impl Expression {
             Expression::Var { expr_type, .. } |
             Expression::VarAssignment { expr_type, .. } |
             Expression::BlockExpression { expr_type, .. } |
-            Expression::IfExpression { expr_type, .. } |
             Expression::Int32Constant { expr_type, .. } => &expr_type,
 
         }
@@ -143,7 +136,6 @@ impl Expression {
             Expression::Var { expr_type, .. } |
             Expression::VarAssignment { expr_type, .. } |
             Expression::BlockExpression { expr_type, .. } |
-            Expression::IfExpression { expr_type, .. } |
             Expression::Int32Constant { expr_type, .. } => *expr_type = new_type,
         }
     }
@@ -295,6 +287,7 @@ fn parse_expression(tokens: &mut TokenStack, min_precedence: usize) -> Option<Ex
                 if (precedence > min_precedence) {
                     tokens.pop_front();
                     if (is_assignment_op(operator)) { // right associative
+                        println!("assignment: {tokens:?}");
                         let mut right = parse_expression(tokens, precedence).expect("Expected expression after assignment");
                         match (&left) {
                             Expression::Var { name, expr_type } => {
@@ -365,15 +358,26 @@ fn parse_factor(tokens: &mut TokenStack) -> Option<Expression> {
             Some(expression)
         },
         Token::Separator(separator) if separator == "{" => {
+            println!("Parsing block");
             let mut index: usize = 1;
 
             let mut block_tokens = VecDeque::new();
-
-            while (peek_or_ret!(tokens, index).content() != "}") {
-                block_tokens.push_back(tokens.get(index).unwrap().clone());
+            let mut bracket_count = 1;
+            while let Some(token) = tokens.get(index) && bracket_count > 0 {
+                if token.content() == "{" {
+                    bracket_count += 1;
+                } else if token.content() == "}" {
+                    bracket_count -= 1;
+                }
+                block_tokens.push_back(token.clone());
                 index += 1;
             };
-            index += 1;
+            block_tokens.pop_back();
+            println!("Finished parsing block: {block_tokens:?}");
+            if bracket_count != 0 {
+                panic!("Expected '}}' for block");
+            }
+            //index += 1;
             peek_or_ret!("->", tokens, index);
             index += 1;
             pop_mult!(tokens, index);

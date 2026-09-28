@@ -85,12 +85,6 @@ fn validate_vars_expression(expression: &Expression, vars: &mut HashSet<String>)
             validate_vars_block(items, vars);
         }
         Expression::Int32Constant { .. } => {},
-        Expression::IfExpression { condition, on_true, on_false, .. } => {
-            validate_vars_expression(condition, vars);
-            validate_vars_expression(on_true, vars);
-            if let Some(expression) = on_false {
-                validate_vars_expression(expression, vars);
-            }
-        }
+        
     }
 }

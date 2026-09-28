@@ -25,11 +25,13 @@ func main() -> i32 {
         b = 0;
     }
 
-    if (b) {
-        b = 100;
-    } else {
-        b = 3;
-    }
+    b = {
+        if (b) {
+            yield 100;
+        } else {
+            yield 3;
+        }
+    } -> i32;
 
     return b;
 

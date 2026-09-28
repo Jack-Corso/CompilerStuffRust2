@@ -65,11 +65,11 @@ impl Instruction {
     pub fn write_to(&self, out: &mut BufWriter<File>) -> io::Result<()> {
         match self {
             Instruction::JumpIfZero { condition, dest } => {
-                writeln!(out, "\tcmpl {condition}, 0")?;
+                writeln!(out, "\tcmpl $0, {condition}")?;
                 writeln!(out, "\tje {dest}")?;
             },
             Instruction::JumpNotZero { condition, dest } => {
-                writeln!(out, "\tcmpl {condition}, 0")?;
+                writeln!(out, "\tcmpl $0, {condition}")?;
                 writeln!(out, "\tjne {dest}")?;
             },
             Instruction::Jump { dest } => {
@@ -193,7 +193,7 @@ macro_rules! reg {
 
 
 
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug, Clone)]
 enum Value {
     Int32Literal(i32),
     Address(StackAddr),
@@ -461,7 +461,7 @@ fn create_tacky_func(func: &Function, instructions: &mut Vec<Instruction>, label
     instructions.push(
         Instruction::StackSetup {
             func_name: func.name.clone(),
-            size: stack.size()
+            size: stack.size().next_power_of_two()
         }
     );
 
@@ -472,7 +472,7 @@ fn create_tacky_func(func: &Function, instructions: &mut Vec<Instruction>, label
     instructions.push(
         Instruction::StackCleanup {
             return_label: ret_label,
-            size: stack.size()
+            size: stack.size().next_power_of_two()
         }
     );
 }
@@ -601,6 +601,6 @@ fn create_tacky_expression(
         },
         Expression::BlockExpression { items, .. } => {
             create_tacky_block(items, instructions, stack_frame, label_manager, false);
-        }
+        },
     }
 }
