@@ -79,5 +79,10 @@ fn scope_vars_expression(expression: &mut Expression, aliases: &mut HashMap<Stri
             scope_vars_block(items, scope_level + 1, aliases);
         }
         Expression::Int32Constant { .. } => {},
+        Expression::FunctionCall { args, .. } => {
+            for arg in args.iter_mut() {
+                scope_vars_expression(arg, aliases, scope_level);
+            }
+        }
     }
 }

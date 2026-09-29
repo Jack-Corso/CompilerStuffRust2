@@ -221,6 +221,10 @@ fn update_stack_frame_expression(stack_frame: &mut StackFrame, expression: &Expr
         Expression::BlockExpression { items, .. } => {
             update_stack_frame_block(stack_frame, items);
         },
-        
+        Expression::FunctionCall { args, .. } => {
+            for arg in args {
+                update_stack_frame_expression(stack_frame, arg);
+            }
+        }
     }
 }

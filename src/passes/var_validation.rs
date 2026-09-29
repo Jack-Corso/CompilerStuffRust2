@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use crate::parsing::{BlockItem, Expression, Program, Statement};
+use crate::typing::Type;
 
 pub fn validate_vars(ast: &Program) {
     for func in ast.body.iter() {
@@ -85,6 +86,10 @@ fn validate_vars_expression(expression: &Expression, vars: &mut HashSet<String>)
             validate_vars_block(items, vars);
         }
         Expression::Int32Constant { .. } => {},
-        
+        Expression::FunctionCall { args, .. } => {
+            for arg in args.iter() {
+                validate_vars_expression(arg, vars);
+            }
+        }
     }
 }

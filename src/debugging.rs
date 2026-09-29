@@ -134,6 +134,14 @@ impl PrettyPrint for Expression {
                 }
                 print!("{}}}", indent_str);
             },
+            Expression::FunctionCall { function_name, args, .. } => {
+                println!("{}FunctionCall[\"{}\"] {{", indent_str, function_name);
+                for arg in args.iter() {
+                    arg.pretty_print(indent+1);
+                    println!(",");
+                }
+                print!("{}}}", indent_str);
+            }
         };
     }
 }

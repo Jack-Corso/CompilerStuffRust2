@@ -99,6 +99,18 @@ fn solve_types_expression(expression: &mut Expression, ident_types: &mut HashMap
         Expression::Int32Constant { expr_type, .. } => {
             *expr_type = Type::Int32;
         },
+        Expression::FunctionCall { function_name, args, expr_type } => {
+            if !matches!(expr_type, Type::Unknown) {
+                return;
+            }
+            for arg in args.iter_mut() {
+                solve_types_expression(arg, ident_types);
+            }
+            if let Type::FuncType { return_type, .. } = ident_types.get(function_name).unwrap() {
+                *expr_type = ident_types.get(function_name).unwrap().clone();
+            }
+
+        }
     }
 }
 

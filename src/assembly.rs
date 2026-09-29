@@ -294,7 +294,7 @@ macro_rules! expand_registers {
         }
     };
 
-    (enum_def: $name: ident { $($vals:tt)* } + [$($letter:ident),*] + [$($letter_no_h:ident),*]nh) => {
+    (enum_def: $name: ident { $($vals:tt)* } + [$($letter:ident),*] + [$($letter_no_h:ident),*]nh + { $($no_h_vals:tt)* }) => {
             paste::item! {
                 #[derive(Copy, Clone, Eq, PartialEq, Debug, strum_macros::EnumString, strum_macros::VariantArray)]
                 enum Register {
@@ -313,6 +313,7 @@ macro_rules! expand_registers {
                         [< $letter_no_h >],
                         [< $letter_no_h L>],
                     )*
+                    $($no_h_vals)*
 
                 }
             }
@@ -322,8 +323,10 @@ macro_rules! expand_registers {
 
 expand_registers!(enum_def:
     Register {
-
-    } + [A, B, C, D] + [SI, DI]nh
+        // registers w/ 8 bit high
+    } + [A, B, C, D] + [SI, DI]nh + {
+        // registers w/out
+    }
 );
 
 

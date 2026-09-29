@@ -74,6 +74,22 @@ fn validate_types_expression(expression: &mut Expression, return_type: Option<&T
         Expression::BlockExpression { items, expr_type } => {
             validate_types_block(items, return_type, Some(&expr_type));
         },
+        Expression::FunctionCall { args, function_name, expr_type } if matches!(expr_type, Type::FuncType { .. }) => {
+            if let Type::FuncType { return_type: func_ret_type, param_types } = expr_type {
+                if args.len() != param_types.len() {
+                    panic!("Wrong # of arguments in func call");
+                }
+                for (arg, param_type) in args.iter_mut().zip(param_types.iter()) {
+                    validate_types_expression(arg, return_type, param_type);
+                }
+                if !func_ret_type.is_convertable_to(expected_type) {
+                    panic!("Expected return type {}, got {}", expected_type, func_ret_type);
+                }
+                *expr_type = func_ret_type.try_cast(expected_type).unwrap();
+            } else {
+                unreachable!();
+            }
+        }
         _ => {
             assert!(expression.get_type_ref().is_convertable_to(expected_type), "Expected type {}, got {}", expected_type, expression.get_type_ref());
             expression.set_type(expression.get_type_ref().try_cast(expected_type).unwrap())

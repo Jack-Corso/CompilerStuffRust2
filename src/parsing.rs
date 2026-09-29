@@ -110,6 +110,11 @@ pub enum Expression {
         items: Vec<BlockItem>,
         expr_type: Type,
     },
+    FunctionCall {
+        function_name: String,
+        args: Vec<Expression>,
+        expr_type: Type,
+    }
 }
 
 impl Expression {
@@ -124,6 +129,7 @@ impl Expression {
             Expression::Var { expr_type, .. } |
             Expression::VarAssignment { expr_type, .. } |
             Expression::BlockExpression { expr_type, .. } |
+            Expression::FunctionCall { expr_type, .. } |
             Expression::Int32Constant { expr_type, .. } => &expr_type,
 
         }
@@ -136,6 +142,7 @@ impl Expression {
             Expression::Var { expr_type, .. } |
             Expression::VarAssignment { expr_type, .. } |
             Expression::BlockExpression { expr_type, .. } |
+            Expression::FunctionCall { expr_type, .. } |
             Expression::Int32Constant { expr_type, .. } => *expr_type = new_type,
         }
     }
@@ -402,21 +409,39 @@ fn parse_factor(tokens: &mut TokenStack) -> Option<Expression> {
         }
         Token::Identifier(name) => {
             tokens.pop_front();
-            let var = Expression::Var { name: name.clone(), expr_type: Type::Unknown };
-            // handle increment & decrement operators
-            if !tokens.is_empty() {
-                let next_cont = tokens[0].content();
-                if next_cont == "++" || next_cont == "--" {
-                    let mut modified_op = String::from(next_cont);
-                    modified_op.push_str("r");
-                    return Some(Expression::UnaryOp {
-                        operator: modified_op,
-                        target: Box::new(var),
-                        expr_type: Type::Unknown
-                    });
+            if tokens.front().is_some() && tokens.front().unwrap().content() == "(" {
+                tokens.pop_front();
+                let mut args = Vec::new();
+                while tokens.front().expect("Unexpected EOF").content() != ")" {
+                    args.push(parse_expression(tokens, 0).expect("Expected args after func call"));
+                    if tokens.front().expect("Unexpected EOF").content() == "," {
+                        tokens.pop_front();
+                    } else if tokens.front().unwrap().content() != ")" {
+                        panic!("args must be comma separated");
+                    }
                 }
+                return Some(Expression::FunctionCall {
+                    function_name: name.clone(),
+                    args,
+                    expr_type: Type::Unknown
+                });
+            } else {
+                let var = Expression::Var { name: name.clone(), expr_type: Type::Unknown };
+                // handle increment & decrement operators
+                if !tokens.is_empty() {
+                    let next_cont = tokens[0].content();
+                    if next_cont == "++" || next_cont == "--" {
+                        let mut modified_op = String::from(next_cont);
+                        modified_op.push_str("r");
+                        return Some(Expression::UnaryOp {
+                            operator: modified_op,
+                            target: Box::new(var),
+                            expr_type: Type::Unknown
+                        });
+                    }
+                }
+                Some(var)
             }
-            Some(var)
         },
         _ => None
     }
