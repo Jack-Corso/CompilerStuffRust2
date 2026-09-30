@@ -293,8 +293,16 @@ macro_rules! expand_registers {
                 | Register::[< $letter L>]
         }
     };
+    (pat_branch_n: $name:ident) => {
+        paste! {
+            Register::[< $name >]
+                | Register::[< $name D>]
+                | Register::[< $name W>]
+                | Register::[< $name B>]
+        }
+    };
 
-    (enum_def: $name: ident { $($vals:tt)* } + [$($letter:ident),*] + [$($letter_no_h:ident),*]nh + { $($no_h_vals:tt)* }) => {
+    (enum_def: $name: ident { $($vals:tt)* } + [$($letter:ident),*] + [$($letter_no_h:ident),*]nh + [$($num_val:ident),*]#) => {
             paste::item! {
                 #[derive(Copy, Clone, Eq, PartialEq, Debug, strum_macros::EnumString, strum_macros::VariantArray)]
                 enum Register {
@@ -313,7 +321,12 @@ macro_rules! expand_registers {
                         [< $letter_no_h >],
                         [< $letter_no_h L>],
                     )*
-                    $($no_h_vals)*
+                    $(
+                        [< $num_val>],
+                        [< $num_val D>],
+                        [< $num_val W>],
+                        [< $num_val B>],
+                    )*
 
                 }
             }
@@ -324,9 +337,7 @@ macro_rules! expand_registers {
 expand_registers!(enum_def:
     Register {
         // registers w/ 8 bit high
-    } + [A, B, C, D] + [SI, DI]nh + {
-        // registers w/out
-    }
+    } + [A, B, C, D] + [SI, DI]nh + [R8, R9, R10, R11, R12, R13, R14, R15]#
 );
 
 
@@ -334,7 +345,7 @@ impl Register {
     const HIGH_SIZE: usize = 5;
     const LOW_SIZE: usize = 4;
     const HIGH_VIEW_CUTOFF: usize = Self::HIGH_SIZE * 4;
-    const LOW_VIEW_CUTOFF: usize = Self::HIGH_VIEW_CUTOFF + Self::LOW_SIZE * 2;
+    const LOW_VIEW_CUTOFF: usize = Self::HIGH_VIEW_CUTOFF + Self::LOW_SIZE * (2 + 8);
 
 
     fn as_8_byte(&self) -> Register {
@@ -372,7 +383,16 @@ impl Register {
 
     fn has_8_bit_high(&self) -> bool {
         match (self) {
-            expand_registers!(pat_branch: SI) | expand_registers!(pat_branch: DI) => false,
+            expand_registers!(pat_branch: SI) |
+            expand_registers!(pat_branch: DI) |
+            expand_registers!(pat_branch_n: R8) |
+            expand_registers!(pat_branch_n: R9) |
+            expand_registers!(pat_branch_n: R10) |
+            expand_registers!(pat_branch_n: R11) |
+            expand_registers!(pat_branch_n: R12) |
+            expand_registers!(pat_branch_n: R13) |
+            expand_registers!(pat_branch_n: R14) |
+            expand_registers!(pat_branch_n: R15) => false,
             _ => true
         }
     }
