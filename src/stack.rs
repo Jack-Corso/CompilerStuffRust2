@@ -23,7 +23,7 @@ impl StackFrame {
        // println!("Allocated {size}");
         self.size += size;
         // println!("Alloc called");
-        let addr = StackAddr::new(self.size, size);
+        let addr = StackAddr::new(-(self.size as isize), size);
         if !self.free_mem.contains_key(&size) {
             self.free_mem.insert(size, Vec::new());
         }
@@ -86,14 +86,14 @@ impl StackFrame {
 
 #[derive(Clone, Copy, Debug, Eq)]
 pub struct StackAddr {
-    offset: usize,
+    offset: isize,
     size: usize,
     is_view: bool,
 }
 
 impl Display for StackAddr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "-{}(%rbp)", self.offset)
+        write!(f, "{}(%rbp)", self.offset)
     }
 }
 
@@ -109,7 +109,7 @@ impl PartialEq for StackAddr {
 }
 
 impl StackAddr {
-    fn new(offset: usize, size: usize) -> StackAddr {
+    fn new(offset: isize, size: usize) -> StackAddr {
         StackAddr {
             offset,
             size,
@@ -117,7 +117,7 @@ impl StackAddr {
         }
     }
 
-    pub fn offset(&self) -> usize {
+    pub fn offset(&self) -> isize {
         self.offset
     }
 
@@ -132,7 +132,7 @@ impl StackAddr {
         if self.is_view {
             panic!("Cannot create a view of ")
         }
-        let offset = self.offset + (self.size - num_bytes);
+        let offset = self.offset - (self.size - num_bytes) as isize;
         let view = StackAddr {
             offset,
             size: num_bytes,
