@@ -1,9 +1,23 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use crate::parsing::{BlockItem, Expression, Function, Program, Statement};
+use crate::typing::Type;
 
 pub fn scope_vars(ast: &mut Program) {
     for func in ast.body.iter_mut() {
-        scope_vars_block(&mut func.body, 0, &mut HashMap::new());
+        let aliases = &mut HashMap::new();
+        match &mut func.func_type {
+            Type::FuncType { param_types, .. } => {
+                for (name, ..) in param_types {
+                    let new_name = format!("{}:0", name);
+                    
+                    let old_name = name.clone();
+                    *name = new_name;
+                    aliases.insert(old_name, vec![name.clone()]);
+                }
+            },
+            _ => unreachable!()
+        }
+        scope_vars_block(&mut func.body, 1, aliases);
     }
 }
 

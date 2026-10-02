@@ -5,7 +5,7 @@ pub enum Type {
     Int32,
     FuncType {
         return_type: Box<Type>,
-        param_types: Vec<Type>,
+        param_types: Vec<(String, Type)>,
     },
     Unknown,
     Any,
@@ -59,7 +59,7 @@ impl Display for Type {
         match self {
             Type::Int32 => write!(f, "i32"),
             Type::FuncType { return_type, param_types } => {
-                write!(f, "fn({}) -> {}", param_types.iter().map(|t| t.to_string()).collect::<Vec<String>>().join(", "), return_type.to_string())
+                write!(f, "fn({}) -> {}", param_types.iter().map(|(name,t)| format!("{name}: {t}")).collect::<Vec<String>>().join(", "), return_type.to_string())
             },
             Type::Unknown => write!(f, "unknown"),
             Type::Any => write!(f, "any"),

@@ -8,6 +8,7 @@ pub struct StackFrame {
     free_mem: HashMap<usize, Vec<StackAddr>>,
     size: usize,
     var_map: HashMap<String, StackAddr>,
+    allocated_params: HashSet<usize>,
 }
 
 impl StackFrame {
@@ -16,6 +17,7 @@ impl StackFrame {
             free_mem: HashMap::new(),
             size: 0,
             var_map: HashMap::new(),
+            allocated_params: HashSet::new(),
         }
     }
 
@@ -44,6 +46,27 @@ impl StackFrame {
         //println!("Reserved {size}");
         let error_msg = "No available stack mem with the given size";
         return self.free_mem.get_mut(&size).expect(error_msg).pop().expect(error_msg);
+    }
+
+    pub fn reserve_param(&mut self, size: usize, param_num: usize, name: String) -> &StackAddr {
+        if !self.allocated_params.insert(param_num) {
+            panic!("Tried to allocate param {param_num} twice");
+        }
+        let addr = StackAddr::new((param_num as isize * 8) + 16, size);
+        self.var_map.insert(name.clone(), addr);
+        
+        return self.var_map.get(&name).unwrap();
+    }
+
+    pub fn free_param(&mut self, name: &String) {
+        let addr = self.var_map.remove(name).expect("Tried to free invalid variable");
+        if addr.offset() < 0 {
+            panic!("Used free_param to free a non-param address");
+        }
+        let param_num: usize = (addr.offset() as usize - 16) / 8;
+        if !self.allocated_params.remove(&param_num) {
+            panic!("Tried to free non-allocated param {param_num}");
+        }
     }
 
     pub fn reserve_var(&mut self, name: String, size: usize) -> &StackAddr {

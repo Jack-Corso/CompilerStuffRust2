@@ -80,7 +80,7 @@ fn validate_types_expression(expression: &mut Expression, return_type: Option<&T
                     panic!("Wrong # of arguments in func call");
                 }
                 for (arg, param_type) in args.iter_mut().zip(param_types.iter()) {
-                    validate_types_expression(arg, return_type, param_type);
+                    validate_types_expression(arg, return_type, &param_type.1);
                 }
                 if !func_ret_type.is_convertable_to(expected_type) {
                     panic!("Expected return type {}, got {}", expected_type, func_ret_type);

@@ -483,20 +483,20 @@ impl LabelManager {
 }
 
 struct Functions {
-    func_map: HashMap<String, (Type, Vec<Type>)>
+    func_map: HashMap<String, (Type, Vec<(String, Type)>)>
 }
 
 impl Functions {
     fn new() -> Functions {
         Functions { func_map: HashMap::new() }
     }
-    fn add_func(&mut self, name: &str, return_type: &Type, arg_types: &Vec<Type>) {
+    fn add_func(&mut self, name: &str, return_type: &Type, arg_types: &Vec<(String, Type)>) {
         self.func_map.insert(String::from(name), (return_type.clone(), arg_types.clone()));
     }
     fn get_func_return_type(&self, name: &str) -> Option<&Type> {
         Some(&self.func_map.get(name)?.0)
     }
-    fn get_func_arg_types(&self, name: &str) -> Option<&Vec<Type>> {
+    fn get_func_args(&self, name: &str) -> Option<&Vec<(String, Type)>> {
         Some(&self.func_map.get(name)?.1)
     }
 }

@@ -56,7 +56,7 @@ pub struct Program {
 pub struct Function {
     pub name: String,
     pub body: Vec<BlockItem>,
-    pub func_type: Type
+    pub func_type: Type,
 }
 
 #[derive(Clone)]
@@ -177,14 +177,29 @@ pub fn parse(tokens: Vec<Token>) -> Program {
 
 fn parse_function(tokens: &mut TokenStack) -> Option<Function> {
     peek_or_ret!("func", tokens, 0);
+    pop_or_panic!(tokens);
     let name: String;
-    if let Token::Identifier(content) = peek_or_ret!(tokens, 1) {
+    if let Token::Identifier(content) = pop_or_panic!(tokens, "Expected function name") {
         name = content.clone();
     } else { return None; }
 
-    peek_or_ret!("(", tokens, 2);
-    peek_or_ret!(")", tokens, 3);
-    pop_mult!(tokens, 4);
+    pop_or_panic!("(", tokens, "Expected \"(\" after function name");
+    let mut param_types = Vec::new();
+    let mut next = pop_or_panic!(tokens, "Expected ')'");
+    while next.content() != ")" {
+        match &next {
+            Token::Identifier(name) => {
+                pop_or_panic!(":", tokens, "Expected type annotation for parameter");
+                pop_or_panic!("i32", tokens);
+                param_types.push((name.clone(), Type::Int32));
+            },
+            _ => panic!("Expected identifier after parameter")
+        }
+        next = pop_or_panic!(tokens, "Expected ')'");
+        if next.content() == "," {
+            next = pop_or_panic!(tokens, "Expected ')'");
+        }
+    }
     pop_or_panic!("->", tokens, "Expected function to have return type");
     pop_or_panic!("i32", tokens);
     pop_or_panic!("{", tokens, "Expected block after function definition");
@@ -201,7 +216,7 @@ fn parse_function(tokens: &mut TokenStack) -> Option<Function> {
         name,
         body: block_items,
         func_type: Type::FuncType {
-            param_types: vec![],
+            param_types,
             return_type: Box::new(Type::Int32)
         },
     })

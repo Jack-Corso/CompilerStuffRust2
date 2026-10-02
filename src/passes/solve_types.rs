@@ -8,6 +8,8 @@ pub fn solve_types(ast: &mut Program) {
     let mut ident_types = HashMap::new();
     for func in ast.body.iter() {
         // cloning func types kinda hurts but whatever
+        todo!();
+
         ident_types.insert(func.name.clone(), func.func_type.clone());
     }
 

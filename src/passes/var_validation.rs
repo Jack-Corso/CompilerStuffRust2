@@ -4,7 +4,16 @@ use crate::typing::Type;
 
 pub fn validate_vars(ast: &Program) {
     for func in ast.body.iter() {
-        validate_vars_block(&func.body, &mut HashSet::new());
+        let vars = &mut HashSet::new();
+        match &func.func_type {
+            Type::FuncType { param_types, .. } => {
+                for param in param_types.iter() {
+                    vars.insert(param.0.clone());
+                }
+            },
+            _ => unreachable!()
+        }
+        validate_vars_block(&func.body, vars);
     }
 }
 
